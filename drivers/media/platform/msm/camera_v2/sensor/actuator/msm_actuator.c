@@ -1504,22 +1504,31 @@ static int32_t msm_actuator_config(struct msm_actuator_ctrl_t *a_ctrl,
 	struct msm_actuator_cfg_data *cdata =
 		(struct msm_actuator_cfg_data *)argp;
 	int32_t rc = 0;
+	int cfgtype = cdata->cfgtype;
 
 	mutex_lock(a_ctrl->actuator_mutex);
 	CDBG("Enter\n");
-	CDBG("%s type %d\n", __func__, cdata->cfgtype);
 
-	if (cdata->cfgtype != CFG_ACTUATOR_INIT &&
-		cdata->cfgtype != CFG_ACTUATOR_POWERUP &&
+	if (a_ctrl->htc_cfgtype) {
+		if (cfgtype == 0) {
+			/* HTC private AF-calibration opcode: no kernel action. */
+			mutex_unlock(a_ctrl->actuator_mutex);
+			return 0;
+		}
+		cfgtype--;
+	}
+
+	CDBG("%s type %d (raw %d)\n", __func__, cfgtype, cdata->cfgtype);
+
+	if (cfgtype != CFG_ACTUATOR_INIT &&
+		cfgtype != CFG_ACTUATOR_POWERUP &&
 		a_ctrl->actuator_state == ACT_DISABLE_STATE) {
 		pr_err("actuator disabled %d\n", rc);
 		mutex_unlock(a_ctrl->actuator_mutex);
 		return rc;
 	}
 
-	switch (cdata->cfgtype) {
-	case CFG_SET_ACTUATOR_AF_VALUE:
-		break;
+	switch (cfgtype) {
 	case CFG_ACTUATOR_INIT:
 		rc = msm_actuator_init(a_ctrl);
 		if (rc < 0)
@@ -1668,12 +1677,16 @@ static long msm_actuator_config_legacy_m(struct msm_actuator_ctrl_t *a_ctrl,
 {
 	struct msm_actuator_cfg_data cdata;
 	long rc;
+	int cfgtype = lc->cfgtype;
+
+	if (a_ctrl->htc_cfgtype && cfgtype > 0)
+		cfgtype--;
 
 	memset(&cdata, 0, sizeof(cdata));
 	cdata.cfgtype = lc->cfgtype;
 	cdata.is_af_supported = lc->is_af_supported;
 
-	if (lc->cfgtype == CFG_SET_ACTUATOR_INFO) {
+	if (cfgtype == CFG_SET_ACTUATOR_INFO) {
 		struct msm_actuator_params_legacy_m_t *lp =
 			&lc->cfg.set_info.actuator_params;
 		struct msm_actuator_params_t *np =
@@ -1692,7 +1705,7 @@ static long msm_actuator_config_legacy_m(struct msm_actuator_ctrl_t *a_ctrl,
 		np->park_lens = lp->park_lens;
 		cdata.cfg.set_info.af_tuning_params =
 			lc->cfg.set_info.af_tuning_params;
-	} else if (lc->cfgtype == CFG_SET_POSITION) {
+	} else if (cfgtype == CFG_SET_POSITION) {
 		uint16_t i;
 
 		cdata.cfg.setpos.number_of_steps =
@@ -1711,8 +1724,8 @@ static long msm_actuator_config_legacy_m(struct msm_actuator_ctrl_t *a_ctrl,
 		return rc;
 
 	/* copy results back (get_info / move curr_lens_pos etc.) */
-	if (lc->cfgtype != CFG_SET_ACTUATOR_INFO &&
-		lc->cfgtype != CFG_SET_POSITION)
+	if (cfgtype != CFG_SET_ACTUATOR_INFO &&
+		cfgtype != CFG_SET_POSITION)
 		memcpy(&lc->cfg, &cdata.cfg, sizeof(lc->cfg));
 	return rc;
 }
@@ -1767,13 +1780,18 @@ static long msm_actuator_subdev_do_ioctl(
 	struct msm_actuator_cfg_data32 *u32 =
 		(struct msm_actuator_cfg_data32 *)arg;
 	struct msm_actuator_cfg_data actuator_data;
+	struct msm_actuator_ctrl_t *a_ctrl = v4l2_get_subdevdata(sd);
 	void *parg = arg;
 	long rc;
+	int cfgtype = 0;
 
 	switch (cmd) {
 	case VIDIOC_MSM_ACTUATOR_CFG32:
 		cmd = VIDIOC_MSM_ACTUATOR_CFG;
-		switch (u32->cfgtype) {
+		cfgtype = u32->cfgtype;
+		if (a_ctrl && a_ctrl->htc_cfgtype && cfgtype > 0)
+			cfgtype--;
+		switch (cfgtype) {
 		case CFG_SET_ACTUATOR_INFO:
 			actuator_data.cfgtype = u32->cfgtype;
 			actuator_data.is_af_supported = u32->is_af_supported;
@@ -1889,7 +1907,7 @@ static long msm_actuator_subdev_do_ioctl(
 
 	case VIDIOC_MSM_ACTUATOR_CFG:
 
-		switch (u32->cfgtype) {
+		switch (cfgtype) {
 
 		case CFG_SET_DEFAULT_FOCUS:
 		case CFG_MOVE_FOCUS:
@@ -2004,6 +2022,8 @@ static int32_t msm_actuator_i2c_probe(struct i2c_client *client,
 
 	act_ctrl_t->legacy_m = of_property_read_bool(client->dev.of_node,
 		"qcom,legacy-m-userspace-abi");
+	act_ctrl_t->htc_cfgtype = of_property_read_bool(client->dev.of_node,
+		"qcom,actuator-htc-cfgtype");
 	if (rc < 0) {
 		pr_err("failed rc %d\n", rc);
 		goto probe_failure;
@@ -2090,6 +2110,9 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 		pr_err("failed rc %d\n", rc);
 		return rc;
 	}
+
+	msm_actuator_t->htc_cfgtype = of_property_read_bool(
+		(&pdev->dev)->of_node, "qcom,actuator-htc-cfgtype");
 
 	rc = of_property_read_u32((&pdev->dev)->of_node, "qcom,cci-master",
 		&msm_actuator_t->cci_master);

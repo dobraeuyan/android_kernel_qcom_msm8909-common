@@ -74,6 +74,7 @@ struct msm_actuator_vreg {
 
 struct msm_actuator_ctrl_t {
 	uint8_t legacy_m;
+	uint8_t htc_cfgtype;
 	struct i2c_driver *i2c_driver;
 	struct platform_driver *pdriver;
 	struct platform_device *pdev;

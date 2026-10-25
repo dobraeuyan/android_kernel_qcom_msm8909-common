@@ -366,28 +366,13 @@ enum msm_sensor_cfg_type_t {
 	CFG_WRITE_I2C_ARRAY_SYNC_BLOCK,
 };
 
+/*
+ * Standard CAF numbering.  HTC userspace (a16/a13) prepends a private
+ * CFG_SET_ACTUATOR_AF_VALUE opcode, shifting every following value by one;
+ * actuator nodes carrying "qcom,actuator-htc-cfgtype" are translated back
+ * in msm_actuator_config().  The x104 userspace uses this standard numbering.
+ */
 enum msm_actuator_cfg_type_t {
-	/* HTC_VCM / Harvey 20130701 - set otp af value.
-	 *
-	 * HTC metió este opcode AL PRINCIPIO del enum, así que TODOS los valores
-	 * siguientes están desfasados +1 respecto al CAF de referencia.  El blob
-	 * del a16 habla la numeración de HTC: manda cfgtype=7 (INIT) y cfgtype=8.
-	 * Sin esta entrada, el 8 caía en el `default:` de msm_actuator_config() y
-	 * devolvía el rc inicial (-EINVAL), con lo que el daemon veía el fallo en
-	 * af_actuator_init() y abortaba la sesión MCT -> msm_post_event: Timed out.
-	 *
-	 * Ver msm_actuator.c:msm_actuator_config() y el kernel de fábrica 3.10
-	 * (youneedthis/a16/android_kernel_htc_a16/include/media/msm_cam_sensor.h),
-	 * donde este case está dentro de `#if 0`: es un no-op deliberado porque el
-	 * OTP del actuador lo trae el propio blob del sensor
-	 * (dmesg: "ov8858_htc_read_otp: OTP Actuator vendor ID & Version = 0x81").
-	 *
-	 * ⚠️ Cambiar esta numeración es un cambio de ABI del uapi.  Verificado que
-	 * todo el árbol usa los nombres simbólicos (grep de CFG_ACTUATOR_*), nadie
-	 * depende de los valores numéricos old.  Ojo: include/uapi/media/msm_camera.h
-	 * tiene OTRO juego de CFG_* como #define con numeración distinta; no se toca.
-	 */
-	CFG_SET_ACTUATOR_AF_VALUE,
 	CFG_GET_ACTUATOR_INFO,
 	CFG_SET_ACTUATOR_INFO,
 	CFG_SET_DEFAULT_FOCUS,

@@ -228,6 +228,7 @@
 		qcom,cci-master = <0>;
 
 		qcom,legacy-m-userspace-abi;
+		qcom,actuator-htc-cfgtype;
 	};
 
 	qcom,camera@0 {
