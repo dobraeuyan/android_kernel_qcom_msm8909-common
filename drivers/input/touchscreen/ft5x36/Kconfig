@@ -1,0 +1,9 @@
+config TOUCHSCREEN_FT5X36
+	bool "FocalTech FT5x36 / FT5626 touchscreen"
+	depends on I2C
+	help
+	  Say Y here to enable support for the FocalTech FT5x36 family
+	  (specifically the FT5626, chip id 0x56) as shipped on some
+	  Lenovo TB-X103F batches.
+
+	  If unsure, say N.

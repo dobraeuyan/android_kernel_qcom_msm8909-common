@@ -1,0 +1,71 @@
+/* Copyright (c) 2026, The LineageOS Project.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&audio_codec_mtp {
+
+	qcom,afe-legacy-clock-set;
+
+	qcom,msm-mbhc-hphl-swh = <1>;
+	qcom,msm-mbhc-gnd-swh = <1>;
+	qcom,msm-hs-micbias-type = "external";
+
+	htc,spk-gpio-5v-en = <&msm_gpio 10 0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&a13_spk_amp_en_active>;
+
+};
+
+&spk_vreg {
+	status = "disabled";
+};
+
+&msm_gpio {
+
+	pmx_a13_spk_amp_en {
+		a13_spk_amp_en_active: a13_spk_amp_en_active {
+			mux {
+				pins = "gpio10";
+				function = "gpio";
+			};
+			config {
+				pins = "gpio10";
+				drive-strength = <2>;
+				bias-disable;
+			};
+		};
+	};
+};
+
+&pm8909_gpios {
+
+	gpio@c000 {
+		status = "okay";
+		qcom,mode = <1>;
+		qcom,invert = <0>;
+		qcom,vin-sel = <3>;
+		qcom,master-en = <1>;
+	};
+
+};
+
+&soc {
+
+	a13_spk_5v_boost: regulator_a13_spk_5v_boost {
+		compatible = "regulator-fixed";
+		regulator-name = "a13_spk_5v_boost";
+		gpio = <&pm8909_gpios 1 0>;
+		enable-active-high;
+		regulator-always-on;
+		regulator-boot-on;
+		startup-delay-us = <1000>;
+	};
+};

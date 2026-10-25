@@ -1,0 +1,86 @@
+/* Copyright (c) 2026, LineageOS Project.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include "dsi-panel-hx8394d-a16-720p-video.dtsi"
+#include "dsi-panel-hx8394d-a16-mr-truly-720p-video.dtsi"
+#include "dsi-panel-hx8394d-a16-success-720p-video.dtsi"
+#include "dsi-panel-hx8394f-a16-truly-720p-video.dtsi"
+#include "dsi-panel-hx8394f-a16-success-720p-video.dtsi"
+
+&mdss_mdp {
+	qcom,mdss-pref-prim-intf = "dsi";
+};
+
+&mdss_dsi0 {
+	qcom,dsi-pref-prim-pan = <&dsi_hx8394d_a16_720_vid>;
+	pinctrl-names = "mdss_default", "mdss_sleep";
+	pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
+	pinctrl-1 = <&mdss_dsi_suspend &mdss_te_suspend>;
+
+	qcom,platform-reset-gpio = <&msm_gpio 25 0>;
+	qcom,platform-bklight-en-gpio = <&msm_gpio 110 0>;
+
+	qcom,platform-regulator-settings = [02 09 03 00 20 00 01];
+};
+
+&soc {
+	a16_lcm_1v8_vreg: a16_lcm_1v8_vreg {
+		compatible = "regulator-fixed";
+		regulator-name = "a16_lcm_1v8";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		gpio = <&msm_gpio 32 0>;
+		enable-active-high;
+		regulator-boot-on;
+		regulator-always-on;
+	};
+
+	a16_lcm_p5v_vreg: a16_lcm_p5v_vreg {
+		compatible = "regulator-fixed";
+		regulator-name = "a16_lcm_p5v";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		gpio = <&msm_gpio 51 0>;
+		enable-active-high;
+		regulator-boot-on;
+		regulator-always-on;
+	};
+
+	a16_lcm_n5v_vreg: a16_lcm_n5v_vreg {
+		compatible = "regulator-fixed";
+		regulator-name = "a16_lcm_n5v";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		gpio = <&msm_gpio 52 0>;
+		enable-active-high;
+		regulator-boot-on;
+		regulator-always-on;
+	};
+};
+
+&i2c_4 {
+	tps_65132@3e {
+		compatible = "disp-tps-65132";
+		reg = <0x3e>;
+	};
+
+	ti_lm3697@36 {
+		compatible = "ti-lm3697";
+
+		reg = <0x36>;
+
+		pwm-cfg = <0x00>;
+		boost-ctl = <0x03>;
+		brightness-cfg = <0x01>;
+		ctl-bank-en = <0x02>;
+	};
+};

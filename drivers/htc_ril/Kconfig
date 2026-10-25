@@ -1,0 +1,15 @@
+config HTC_RADIO_SMEM
+	bool "HTC radio shared memory (AP run-mode handshake)"
+	depends on OF
+	default n
+	help
+	  Writes a 1 KiB structure to a fixed region in DRAM. The MPSS on
+	  HTC devices reads this at boot to determine the execution state
+	  of the Application Processor (bootloader, FTM, recovery, or HLOS).
+
+	  Without this, the modem boots in a restricted mode. While RF and
+	  SIM remain functional, it does not expose the QMUX control SMD
+	  channels (DATA5_CNTL/DATA40_CNTL), causing qmuxd to fail with
+	  -ENODEV and breaking telephony.
+
+	  Required for the HTC Desire 530 (a16).

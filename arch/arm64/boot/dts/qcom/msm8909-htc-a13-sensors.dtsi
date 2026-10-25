@@ -1,0 +1,92 @@
+/* Copyright (c) 2016, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&i2c_1 {
+	status = "okay";
+
+	bosch@18 {
+		compatible = "bosch,bma2x2";
+		reg = <0x18>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <96 0x2002>;
+		vdd-supply = <&pm8909_l17>;
+		vio-supply = <&pm8909_l6>;
+		bosch,init-interval = <200>;
+		bosch,place = <0>;
+		bosch,gpio-int1 = <&msm_gpio 96 0x2002>;
+		bosch,use-hrtimer;
+	};
+
+	cm36686@60 {
+		compatible = "capella,cm36686";
+		reg = <0x60>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <94 0x02>;
+		interrupt-names = "cm36686";
+		cm36686,irq-gpio = <&msm_gpio 94 0x00>;
+		cm36686,levels = <0x0f 0x27 0x3f 0x13c 0x27f 0xfa8 0x1674 0x2a14 0x38b5 0xffff>;
+		cm36686,golden_adc = <0xe43>;
+		cm36686,cm36686_slave_address = <0x60>;
+		cm36686,ps1_thd_set = <0x15>;
+		cm36686,ps_th_add = <0x28>;
+		cm36686,ps1_thd_no_cal = <0xaaa>;
+		cm36686,dynamical_threshold = <0x01>;
+		cm36686,dark_level = <0x03>;
+		cm36686,ps_duty = <0x00>;
+		cm36686,ps_pers = <0x01>;
+		cm36686,ps_it = <0x07>;
+		cm36686,ps_hd = <0x00>;
+		cm36686,ps_led_current = <0x02>;
+		pinctrl-names = "cm36686_ps_init";
+		pinctrl-0 = <&a13_alsps_int_init>;
+	};
+
+	elan@49 {
+		compatible = "elan,epl88051";
+		reg = <0x49>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <94 0x02>;
+		interrupt-names = "epl88051";
+		epl88051,irq-gpio = <&msm_gpio 94 0x00>;
+		epl88051,levels = <0x07 0x0e 0x15 0x5a 0xb1 0x47c 0x6ac 0xbf6 0x1034 0xffff>;
+		epl88051,golden_adc = <0x3ec>;
+		epl88051,epl88051_slave_address = <0x49>;
+		epl88051,ps1_thd_set = <0x15>;
+		epl88051,ps_th_add = <0x951>;
+		epl88051,ps1_thd_no_cal = <0xaaa>;
+		epl88051,dynamical_threshold = <0x01>;
+		epl88051,dark_level = <0x03>;
+		epl88051,ps_duty = <0x06>;
+		epl88051,ps_pers = <0x00>;
+		epl88051,ps_it = <0x24>;
+		epl88051,ps_hd = <0x00>;
+		epl88051,ps_led_current = <0x01>;
+		pinctrl-names = "cm36686_ps_init";
+		pinctrl-0 = <&a13_alsps_int_init>;
+	};
+};
+
+&msm_gpio {
+	pmx_a13_alsps_int {
+		a13_alsps_int_init: a13_alsps_int_init {
+			mux {
+				pins = "gpio94";
+				function = "gpio";
+			};
+			config {
+				pins = "gpio94";
+				drive-strength = <2>;
+				bias-disable;
+			};
+		};
+	};
+};

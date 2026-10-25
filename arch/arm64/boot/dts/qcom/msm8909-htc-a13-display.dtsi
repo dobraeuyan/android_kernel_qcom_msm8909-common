@@ -1,0 +1,56 @@
+/* Copyright (c) 2026, LineageOS Project.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include "dsi-panel-hx8389b-a13-tianma-qhd-video.dtsi"
+#include "dsi-panel-hx8389b-a13-tianma-a2-qhd-video.dtsi"
+#include "dsi-panel-ili9807-a13-bitland-qhd-video.dtsi"
+
+&mdss_mdp {
+	qcom,mdss-pref-prim-intf = "dsi";
+};
+
+&mdss_dsi0 {
+	qcom,dsi-pref-prim-pan = <&dsi_hx8389b_a13_tianma_qhd_vid>;
+	pinctrl-names = "mdss_default", "mdss_sleep";
+	pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
+	pinctrl-1 = <&mdss_dsi_suspend &mdss_te_suspend>;
+
+	qcom,platform-reset-gpio = <&msm_gpio 25 0>;
+	qcom,platform-bklight-en-gpio = <&msm_gpio 110 0>;
+};
+
+&soc {
+	a13_lcm_3v_vreg: a13_lcm_3v_vreg {
+		compatible = "regulator-fixed";
+		regulator-name = "a13_lcm_3v";
+		regulator-min-microvolt = <3000000>;
+		regulator-max-microvolt = <3000000>;
+		gpio = <&msm_gpio 52 0>;
+		enable-active-high;
+		regulator-boot-on;
+		regulator-always-on;
+	};
+};
+
+&i2c_4 {
+	status = "okay";
+
+	ti_lm3697@36 {
+		compatible = "ti-lm3697";
+
+		reg = <0x36>;
+		pwm-cfg = <0x00>;
+		boost-ctl = <0x03>;
+		brightness-cfg = <0x01>;
+		ctl-bank-en = <0x02>;
+	};
+};

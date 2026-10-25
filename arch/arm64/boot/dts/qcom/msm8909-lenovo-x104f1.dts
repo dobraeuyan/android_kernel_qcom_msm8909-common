@@ -1,0 +1,38 @@
+/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+
+#include "lenovo-x104-common.dtsi"
+#include "lenovo-x104-memory-modem83m.dtsi"
+
+/ {
+	model = "Lenovo Tab E10 (TB-X104F1)";
+	compatible = "lenovo,x104f1", "lenovo,x104", "qcom,msm8909",
+		     "qcom,apq8009", "qcom,mtp";
+	qcom,msm-id = <245 2 265 2>;
+	qcom,board-id= <8 0x8 65547 0x0>;
+};
+
+&mdss_dsi0 {
+	qcom,platform-bklight-en-gpio = <&msm_gpio 49 0>;
+};
+
+&dsi_nt35521z_inx101_video {
+	qcom,mdss-pan-physical-width-dimension = <137>;
+	qcom,mdss-pan-physical-height-dimension = <217>;
+};
+
+&dsi_jd9365_starry_video {
+	qcom,mdss-pan-physical-width-dimension = <137>;
+	qcom,mdss-pan-physical-height-dimension = <217>;
+};

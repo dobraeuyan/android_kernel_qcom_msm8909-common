@@ -1,0 +1,27 @@
+#
+# Himax HX852xES touchscreen driver (HTC a16 / Desire 530)
+#
+
+config TOUCHSCREEN_HIMAX_852XES
+	bool "Himax HX852xES touchscreen"
+	depends on I2C
+	help
+	  Say Y here to enable support for the Himax HX852xES touch controller.
+
+	  If unsure, say N.
+
+config TOUCHSCREEN_HIMAX_852XES_DEBUG
+	bool "Himax HX852xES debug/diag nodes"
+	depends on TOUCHSCREEN_HIMAX_852XES
+	help
+	  Enables /sys/android_touch sysfs nodes for diagnostics, registers,
+	  debugging, flash dumps, self-tests, and hardware resets. This also
+	  enables verbose logging for the driver.
+
+config TOUCHSCREEN_HIMAX_852XES_ESD
+	bool "Himax HX852xES ESD workaround"
+	depends on TOUCHSCREEN_HIMAX_852XES
+	help
+	  Enables an Electrostatic Discharge (ESD) recovery routine. If the
+	  touch controller stops responding due to an ESD event, this
+	  workaround automatically restarts it via the hardware reset line.

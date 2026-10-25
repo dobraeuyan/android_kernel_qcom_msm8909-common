@@ -1,0 +1,2 @@
+obj-$(CONFIG_TOUCHSCREEN_FT5X36)	+= ft5x36_ts.o
+obj-$(CONFIG_TOUCHSCREEN_FT5X36)	+= ft5x36_ex.o

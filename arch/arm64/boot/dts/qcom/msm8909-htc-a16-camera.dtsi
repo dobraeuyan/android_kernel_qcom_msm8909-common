@@ -1,0 +1,325 @@
+/*
+ * Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2026 The LineageOS Project
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&i2c_3 {
+	/delete-node/ qcom,actuator@0;
+	/delete-node/ qcom,eeprom@6c;
+	/delete-node/ qcom,led-flash@60;
+	/delete-node/ qcom,camera@0;
+	/delete-node/ qcom,camera@1;
+};
+
+&msm_gpio {
+	a16_cam_sensor_rear_default: a16_cam_sensor_rear_default {
+
+		mux {
+			pins = "gpio35";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio35";
+			bias-disable;
+			drive-strength = <2>;
+		};
+	};
+
+	a16_cam_sensor_rear_sleep: a16_cam_sensor_rear_sleep {
+		mux {
+			pins = "gpio35";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio35";
+			bias-disable;
+			drive-strength = <2>;
+		};
+	};
+
+	a16_cam_sensor_front_default: a16_cam_sensor_front_default {
+
+		mux {
+			pins = "gpio28", "gpio23", "gpio8";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio28", "gpio23", "gpio8";
+			bias-disable;
+			drive-strength = <2>;
+		};
+	};
+
+	a16_cam_sensor_front_sleep: a16_cam_sensor_front_sleep {
+		mux {
+			pins = "gpio28", "gpio23", "gpio8";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio28", "gpio23", "gpio8";
+
+			output-low;
+			drive-strength = <2>;
+		};
+	};
+};
+
+&soc {
+	qcom,csid@1b08000 {
+		qcom,legacy-m-userspace-abi;
+	};
+
+	qcom,csid@1b08400 {
+		qcom,legacy-m-userspace-abi;
+	};
+
+	led_flash0: qcom,camera-flash {
+		cell-index = <0>;
+		compatible = "qcom,camera-flash";
+		qcom,flash-type = <1>;
+		qcom,flash-source = <&tps61310_flash0>;
+		qcom,torch-source = <&tps61310_torch0>;
+		status = "ok";
+	};
+};
+
+&i2c_4 {
+	ncp6924@10 {
+		compatible = "htc,ncp6924-regulator";
+		reg = <0x10>;
+		ncp,use-ioexpander = <0>;
+		ncp,enable-gpio = <&msm_gpio 93 0>;
+		ncp6924_ldo-supply = <&ncp6924_dcdc2>;
+		status = "ok";
+
+		ncp6924_dcdc1: regulator-dcdc1 {
+			regulator-name = "ncp6924_dcdc1";
+			regulator-min-microvolt = <600000>;
+			regulator-max-microvolt = <3300000>;
+			ncp,resource-id = <1>;
+			ncp,regulator-type = <0>;
+			ncp,enable-addr = <0x14>;
+			ncp,enable-bit = <0x01>;
+			ncp,mode-bit = <0x00>;
+			ncp,mode = <0x00>;
+			ncp,base-addr = <0x20>;
+		};
+
+		ncp6924_dcdc2: regulator-dcdc2 {
+			regulator-name = "ncp6924_dcdc2";
+			regulator-min-microvolt = <3100000>;
+			regulator-max-microvolt = <3100000>;
+			regulator-boot-on;
+			regulator-always-on;
+			ncp,resource-id = <2>;
+			ncp,regulator-type = <0>;
+			ncp,enable-addr = <0x14>;
+			ncp,enable-bit = <0x03>;
+			ncp,base-addr = <0x22>;
+		};
+
+		ncp6924_ldo1: regulator-ldo1 {
+			regulator-name = "ncp6924_ldo1";
+			regulator-min-microvolt = <1000000>;
+			regulator-max-microvolt = <3300000>;
+			ncp,resource-id = <3>;
+			ncp,regulator-type = <1>;
+			ncp,enable-addr = <0x14>;
+			ncp,enable-bit = <0x04>;
+			ncp,base-addr = <0x24>;
+			parent-supply;
+		};
+
+		ncp6924_ldo2: regulator-ldo2 {
+			regulator-name = "ncp6924_ldo2";
+			regulator-min-microvolt = <1000000>;
+			regulator-max-microvolt = <3300000>;
+			ncp,resource-id = <4>;
+			ncp,regulator-type = <1>;
+			ncp,enable-addr = <0x14>;
+			ncp,enable-bit = <0x05>;
+			ncp,base-addr = <0x25>;
+			parent-supply;
+		};
+
+		ncp6924_ldo3: regulator-ldo3 {
+			regulator-name = "ncp6924_ldo3";
+			regulator-min-microvolt = <1000000>;
+			regulator-max-microvolt = <3300000>;
+			ncp,resource-id = <5>;
+			ncp,regulator-type = <1>;
+			ncp,enable-addr = <0x14>;
+			ncp,enable-bit = <0x06>;
+			ncp,base-addr = <0x26>;
+			parent-supply;
+		};
+
+		ncp6924_ldo4: regulator-ldo4 {
+			regulator-name = "ncp6924_ldo4";
+			regulator-min-microvolt = <1000000>;
+			regulator-max-microvolt = <3300000>;
+			ncp,resource-id = <6>;
+			ncp,regulator-type = <1>;
+			ncp,enable-addr = <0x14>;
+			ncp,enable-bit = <0x07>;
+			ncp,base-addr = <0x27>;
+			parent-supply;
+		};
+	};
+
+	tps61310@33 {
+		compatible = "TPS61310_FLASHLIGHT";
+		reg = <0x33>;
+
+		tps61310,tps61310_strb0 = <&msm_gpio 31 0>;
+		tps61310,tps61310_strb1 = <&msm_gpio 33 0>;
+		tps61310,flash_duration_ms = <600>;
+		tps61310,enable_FLT_1500mA = <0>;
+		tps61310,led_count = <1>;
+		tps61310,disable_tx_mask = <1>;
+		htc,dualflash = <0>;
+
+		status = "ok";
+
+		tps61310_flash0: htc,tps61310_flash_0 {
+			label = "flash";
+			linux,name = "flash_0";
+			linux,default-trigger = "flash0_trigger";
+			htc,id = <0>;
+			htc,default-state = "off";
+			htc,max-current = <750>;
+			qcom,max-current = <750>;
+			qcom,current = <750>;
+		};
+
+		tps61310_torch0: htc,tps61310_torch_0 {
+			label = "torch";
+			linux,name = "torch_0";
+			linux,default-trigger = "torch0_trigger";
+			htc,id = <0>;
+			htc,default-state = "off";
+			htc,max-current = <200>;
+			qcom,max-current = <200>;
+			qcom,current = <200>;
+		};
+	};
+};
+
+&i2c_3 {
+	status = "ok";
+
+	actuator0: qcom,actuator@1c {
+		cell-index = <0>;
+		reg = <0x1c>;
+		compatible = "qcom,actuator";
+		qcom,cci-master = <0>;
+
+		qcom,legacy-m-userspace-abi;
+	};
+
+	qcom,camera@0 {
+		cell-index = <0>;
+		compatible = "htc,ov8858_htc";
+		reg = <0x6c>;
+		qcom,slave-id = <0x6c 0x302a 0xb200>;
+
+		qcom,sensor-name = "ov8858_htc";
+		qcom,csiphy-sd-index = <0>;
+		qcom,csid-sd-index = <0>;
+		qcom,mount-angle = <90>;
+		qcom,actuator-src = <&actuator0>;
+		qcom,led-flash-src = <&led_flash0>;
+		qcom,sensor-position = <0>;
+		qcom,cci-master = <0>;
+		qcom,csi-lane-assign = <0x4320>;
+		qcom,csi-lane-mask = <0x07>;
+		cam_vdig-supply = <&ncp6924_dcdc1>;
+		cam_vio-supply = <&ncp6924_ldo4>;
+		cam_vana-supply = <&ncp6924_ldo2>;
+		cam_vaf-supply = <&ncp6924_ldo1>;
+
+		qcom,cam-vreg-name = "cam_vdig", "cam_vio",
+				     "cam_vana", "cam_vaf";
+		qcom,cam-vreg-type = <0 0 0 0>;
+		qcom,cam-vreg-min-voltage = <1200000 1800000 2800000 2800000>;
+		qcom,cam-vreg-max-voltage = <1200000 1800000 2800000 2800000>;
+		qcom,cam-vreg-op-mode = <0 0 0 0>;
+
+		pinctrl-names = "cam_default", "cam_suspend";
+		pinctrl-0 = <&cam_sensor_mclk0_default
+			     &a16_cam_sensor_rear_default>;
+		pinctrl-1 = <&cam_sensor_mclk0_sleep
+			     &a16_cam_sensor_rear_sleep>;
+
+		gpios = <&msm_gpio 26 0>,
+			<&msm_gpio 35 0>;
+		qcom,gpio-reset = <1>;
+		qcom,gpio-req-tbl-num = <0 1>;
+		qcom,gpio-req-tbl-flags = <1 0>;
+		qcom,gpio-req-tbl-label = "CAMIF_MCLK", "CAM_RST";
+		status = "ok";
+		clocks = <&clock_gcc clk_mclk0_clk_src>,
+			 <&clock_gcc clk_gcc_camss_mclk0_clk>;
+		clock-names = "cam_src_clk", "cam_clk";
+		qcom,clock-rates = <24000000 0>;
+	};
+
+	qcom,camera@1 {
+		cell-index = <1>;
+		compatible = "htc,s5k5e_htc";
+		reg = <0x20>;
+		qcom,slave-id = <0x20 0x0000 0x5e20>;
+
+		qcom,sensor-name = "s5k5e_htc";
+		qcom,csiphy-sd-index = <0>;
+		qcom,csid-sd-index = <0>;
+		qcom,mount-angle = <270>;
+		qcom,sensor-position = <1>;
+		qcom,cci-master = <0>;
+		qcom,csi-lane-assign = <0x0004>;
+		qcom,csi-lane-mask = <0x18>;
+		cam_vdig-supply = <&ncp6924_ldo3>;
+		cam_vio-supply = <&ncp6924_ldo4>;
+
+		cam_vaf-supply = <&ncp6924_ldo1>;
+		qcom,cam-vreg-name = "cam_vdig", "cam_vio",
+				     "cam_vana", "cam_vaf";
+		qcom,cam-vreg-type = <0 0 0 0>;
+		qcom,cam-vreg-min-voltage = <1200000 1800000 2800000 2800000>;
+		qcom,cam-vreg-max-voltage = <1200000 1800000 2800000 2800000>;
+		qcom,cam-vreg-op-mode = <0 0 0 0>;
+		pinctrl-names = "cam_default", "cam_suspend";
+		pinctrl-0 = <&cam_sensor_mclk1_default
+			     &a16_cam_sensor_front_default>;
+		pinctrl-1 = <&cam_sensor_mclk1_sleep
+			     &a16_cam_sensor_front_sleep>;
+
+		gpios = <&msm_gpio 27 0>,
+			<&msm_gpio 28 0>,
+			<&msm_gpio 8 0>;
+		qcom,gpio-reset = <1>;
+		qcom,gpio-custom1 = <2>;
+		qcom,gpio-req-tbl-num = <0 1 2>;
+		qcom,gpio-req-tbl-flags = <1 0 0>;
+		qcom,gpio-req-tbl-label = "CAMIF_MCLK", "CAM_RST",
+					  "CAM_SEL";
+		status = "ok";
+		clocks = <&clock_gcc clk_mclk1_clk_src>,
+			 <&clock_gcc clk_gcc_camss_mclk1_clk>;
+		clock-names = "cam_src_clk", "cam_clk";
+		qcom,clock-rates = <24000000 0>;
+	};
+};

@@ -1,0 +1,40 @@
+/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include "lenovo-x104-memory-modem83m.dtsi"
+
+&mdss_dsi0 {
+	qcom,platform-bklight-en-gpio = <&msm_gpio 49 0>;
+};
+
+&mdss_dsi0_pll {
+	qcom,dsi-pll-ssc-en;
+	qcom,dsi-pll-ssc-mode = "down-spread";
+	qcom,ssc-frequency-hz = <30000>;
+	qcom,ssc-ppm = <5000>;
+};
+
+&i2c_1 {
+	Semtech_sx9310@28 {
+		compatible = "Semtech,sx9310";
+		reg = <0x28>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <11 0x0>;
+		vdd-supply = <&pm8916_l11>;
+		Semtech,nirq-gpio = <&msm_gpio 11 0x0>;
+		Semtech,reg-num = <0x19>;
+		Semtech,reg-init = [11 00 12 04 13 0a 14 0d 15 c1 16 20
+			17 4c 18 7e 19 7d 1a 00 1b 00 1c 00 1d 00 1e 00
+			1f 00 20 00 21 04 22 00 23 00 2a 00 2b 80 2c 0c
+			03 60 04 00 10 27];
+	};
+};

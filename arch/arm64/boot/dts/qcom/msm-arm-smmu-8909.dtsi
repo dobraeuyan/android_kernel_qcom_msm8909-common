@@ -1,0 +1,191 @@
+/*
+ * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+
+&soc {
+
+	kgsl_smmu: gpu_iommu: iommu@1f08000 {
+		compatible = "qcom,msm-iommu-v1";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		#iommu-cells = <1>;
+		ranges = <0 0x1f08000 0x8000>;
+		clocks = <&clock_gcc clk_gcc_smmu_cfg_clk>,
+			 <&clock_gcc clk_gcc_gfx_tcu_clk>;
+		clock-names = "iface", "bus";
+
+		vdd-supply = <&gdsc_oxili_gx>;
+		qcom,iommu-secure-id = <18>;
+		status = "ok";
+
+		iommu-ctx@1000 {
+			compatible = "qcom,msm-iommu-v1-ns";
+			reg = <0x1000 0x1000>;
+			interrupts = <GIC_SPI 241 IRQ_TYPE_LEVEL_HIGH>;
+			qcom,ctx-asid = <0>;
+		};
+
+		iommu-ctx@2000 {
+			compatible = "qcom,msm-iommu-v1-ns";
+			reg = <0x2000 0x1000>;
+			interrupts = <GIC_SPI 242 IRQ_TYPE_LEVEL_HIGH>;
+			qcom,ctx-asid = <1>;
+		};
+	};
+
+	apps_iommu: iommu@1e20000 {
+		compatible = "qcom,msm-iommu-v1";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		#iommu-cells = <1>;
+		ranges = <0 0x1e20000 0x20000>;
+		clocks = <&clock_gcc clk_gcc_smmu_cfg_clk>,
+			 <&clock_gcc clk_gcc_apss_tcu_clk>;
+		clock-names = "iface", "bus";
+		qcom,iommu-secure-id = <17>;
+		status = "ok";
+
+		iommu-ctx@3000 {
+			compatible = "qcom,msm-iommu-v1-ns";
+			reg = <0x3000 0x1000>;
+			interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@4000 {
+			compatible = "qcom,msm-iommu-v1-ns";
+			reg = <0x4000 0x1000>;
+			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@5000 {
+			compatible = "qcom,msm-iommu-v1-ns";
+			reg = <0x5000 0x1000>;
+			interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@7000 {
+			compatible = "qcom,msm-iommu-v1-ns";
+			reg = <0x7000 0x1000>;
+			interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@8000 {
+			compatible = "qcom,msm-iommu-v1-ns";
+			reg = <0x8000 0x1000>;
+			interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@9000 {
+			compatible = "qcom,msm-iommu-v1-ns";
+			reg = <0x9000 0x1000>;
+			interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@a000 {
+			compatible = "qcom,msm-iommu-v1-ns";
+			reg = <0xa000 0x1000>;
+			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@18000 {
+			compatible = "qcom,msm-iommu-v1-ns";
+			reg = <0x18000 0x1000>;
+			interrupts = <GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@19000 {
+			compatible = "qcom,msm-iommu-v1-ns";
+			reg = <0x19000 0x1000>;
+			interrupts = <GIC_SPI 230 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@1a000 {
+			compatible = "qcom,msm-iommu-v1-ns";
+			reg = <0x1a000 0x1000>;
+			interrupts = <GIC_SPI 231 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@1b000 {
+			compatible = "qcom,msm-iommu-v1-ns";
+			reg = <0x1b000 0x1000>;
+			interrupts = <GIC_SPI 232 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@1c000 {
+			compatible = "qcom,msm-iommu-v1-ns";
+			reg = <0x1c000 0x1000>;
+			interrupts = <GIC_SPI 233 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@1d000 {
+			compatible = "qcom,msm-iommu-v1-ns";
+			reg = <0x1d000 0x1000>;
+			interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@2000 {
+			compatible = "qcom,msm-iommu-v1-sec";
+			reg = <0x2000 0x1000>;
+			interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@11000 {
+			compatible = "qcom,msm-iommu-v1-sec";
+			reg = <0x11000 0x1000>;
+			interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@12000 {
+			compatible = "qcom,msm-iommu-v1-sec";
+			reg = <0x12000 0x1000>;
+			interrupts = <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@13000 {
+			compatible = "qcom,msm-iommu-v1-sec";
+			reg = <0x13000 0x1000>;
+			interrupts = <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@14000 {
+			compatible = "qcom,msm-iommu-v1-sec";
+			reg = <0x14000 0x1000>;
+			interrupts = <GIC_SPI 223 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@15000 {
+			compatible = "qcom,msm-iommu-v1-sec";
+			reg = <0x15000 0x1000>;
+			interrupts = <GIC_SPI 224 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@16000 {
+			compatible = "qcom,msm-iommu-v1-ns";
+			reg = <0x16000 0x1000>;
+			interrupts = <GIC_SPI 225 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@17000 {
+			compatible = "qcom,msm-iommu-v1-sec";
+			reg = <0x17000 0x1000>;
+			interrupts = <GIC_SPI 228 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		iommu-ctx@1f000 {
+			compatible = "qcom,msm-iommu-v1-sec";
+			reg = <0x1f000 0x1000>;
+			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
+		};
+	};
+};

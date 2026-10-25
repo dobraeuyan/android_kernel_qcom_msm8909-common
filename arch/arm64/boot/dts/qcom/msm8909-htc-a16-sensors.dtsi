@@ -1,0 +1,93 @@
+/* Copyright (c) 2016, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&i2c_1 {
+	status = "okay";
+
+	bosch@18 {
+		compatible = "bosch,bma2x2";
+		reg = <0x18>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <96 0x2002>;
+		vdd-supply = <&pm8909_l17>;
+		vio-supply = <&pm8909_l6>;
+		bosch,init-interval = <200>;
+		bosch,place = <0>;
+		bosch,gpio-int1 = <&msm_gpio 96 0x2002>;
+		bosch,use-hrtimer;
+	};
+
+	cm36686@60 {
+		compatible = "capella,cm36686";
+		reg = <0x60>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <94 0x02>;
+		interrupt-names = "cm36686";
+		cm36686,irq-gpio = <&msm_gpio 94 0x00>;
+		cm36686,levels = <0x09 0x0e 0x13 0x5a 0xb3 0x957 0x1503 0x1e5a 0x255b 0xffff>;
+		cm36686,leveltolux = <0x00 0x04 0x14 0x2d 0x4b 0x96 0x7d0 0x1194 0x1964 0x2260>;
+		cm36686,golden_adc = <0x410>;
+		cm36686,cm36686_slave_address = <0x60>;
+		cm36686,ps1_thd_set = <0x15>;
+		cm36686,ps1_thd_no_cal = <0xaaa>;
+		cm36686,dynamical_threshold = <0x01>;
+		cm36686,dark_level = <0x03>;
+		cm36686,ps_duty = <0x00>;
+		cm36686,ps_pers = <0x01>;
+		cm36686,ps_it = <0x07>;
+		cm36686,ps_hd = <0x00>;
+		cm36686,ps_led_current = <0x02>;
+		pinctrl-names = "cm36686_ps_init";
+		pinctrl-0 = <&a16_alsps_int_init>;
+	};
+
+	elan@49 {
+		compatible = "elan,epl88051";
+		reg = <0x49>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <94 0x02>;
+		interrupt-names = "epl88051";
+		epl88051,irq-gpio = <&msm_gpio 94 0x00>;
+		epl88051,levels = <0x09 0x0d 0x10 0x30 0x5f 0x4f7 0xb2c 0x1024 0x13dd 0xffff>;
+		epl88051,leveltolux = <0x00 0x04 0x14 0x2d 0x4b 0x96 0x7d0 0x1194 0x1964 0x2260>;
+		epl88051,golden_adc = <0x229>;
+		epl88051,epl88051_slave_address = <0x49>;
+		epl88051,ps1_thd_set = <0x15>;
+		epl88051,ps_th_add = <0x1f4>;
+		epl88051,ps1_thd_no_cal = <0xaaa>;
+		epl88051,dynamical_threshold = <0x01>;
+		epl88051,dark_level = <0x03>;
+		epl88051,ps_duty = <0x06>;
+		epl88051,ps_pers = <0x00>;
+		epl88051,ps_it = <0x18>;
+		epl88051,ps_hd = <0x00>;
+		epl88051,ps_led_current = <0x00>;
+		pinctrl-names = "cm36686_ps_init";
+		pinctrl-0 = <&a16_alsps_int_init>;
+	};
+};
+
+&msm_gpio {
+	pmx_a16_alsps_int {
+		a16_alsps_int_init: a16_alsps_int_init {
+			mux {
+				pins = "gpio94";
+				function = "gpio";
+			};
+			config {
+				pins = "gpio94";
+				drive-strength = <2>;
+				bias-disable;
+			};
+		};
+	};
+};

@@ -1,0 +1,8 @@
+config TOUCHSCREEN_GSLX68X
+	bool "Silead GSLx68x (gsl-tp) capacitive touchscreen"
+	depends on I2C
+	help
+	  Say Y here to enable support for the Silead GSLx68x family
+	  capacitive touch controller
+
+	  If unsure, say N.

@@ -1,0 +1,325 @@
+/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include "msm8909-qrd.dtsi"
+#include "msm8909-bamboo-memory.dtsi"
+#include "msm8909-camera.dtsi"
+#include "msm8909-bamboo-camera.dtsi"
+
+#include "msm8909-bamboo-audio.dtsi"
+
+&mdss_dsi {
+	vdda-supply = <&pm8909_l2>;
+	vddio-supply = <&pm8909_l6>;
+};
+
+&mdss_dsi0 {
+	vdd-supply = <&pm8909_l17>;
+	vddio-supply = <&pm8909_l6>;
+
+};
+
+&i2c_5 {
+	status = "okay";
+
+	hideep@6c {
+		compatible = "hideep,ts";
+		reg = <0x6c>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <13 0x2>;
+		vdd-supply = <&pm8909_l17>;
+		vcc_i2c-supply = <&pm8909_l6>;
+		hideep,reset-gpio = <&msm_gpio 12 0x0>;
+		hideep,irq-gpio = <&msm_gpio 13 0x0>;
+
+		hideep,power_ldo-gpio = <&msm_gpio 92 0x0>;
+		hideep,tp-vendor-gpio = <&msm_gpio 110 0x0>;
+		hideep,i2c-pull-up;
+		hideep,version = <1>;
+		hideep,max-x = <0x320>;
+		hideep,max-y = <0x500>;
+		hideep,max-z = <0xff>;
+		hideep,max-w = <0xff>;
+		status = "ok";
+	};
+};
+
+&i2c_4 {
+	status = "okay";
+
+	smb358_otg_supply: smb358-charger@57 {
+		compatible = "qcom,smb358-charger";
+		reg = <0x57>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <58 8>;
+		qcom,irq-gpio = <&msm_gpio 58 0x2008>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&smb_int_default>;
+		qcom,vddio-gpio = <&msm_gpio 68 0x0>;
+		qcom,vbusst-gpio = <&msm_gpio 3 0x0>;
+		qcom,chg-inhibit-disabled;
+
+		qcom,float-voltage-mv = <4320>;
+		qcom,iterm-ma = <150>;
+		qcom,recharge-mv = <100>;
+		qcom,charging-timeout = <384>;
+		qcom,otg-batt-curr-limit = <950>;
+		qcom,recharge-thresh-mv = <100>;
+		qcom,thermal-mitigation = <1500 700 600 0>;
+		qcom,fastchg-current-max-ma = <2000>;
+
+		qcom,dcp-input-current-ma = <2000>;
+		qcom,chg-vadc = <&pm8909_vadc>;
+		qcom,chg-adc_tm = <&pm8909_adc_tm>;
+		qcom,hot-bat-decidegc = <500>;
+		qcom,cold-bat-decidegc = <0>;
+		qcom,bat-present-decidegc = <200>;
+
+		qcom,batt-temp-hot-suspend-decidegc = <490>;
+		qcom,batt-temp-cold-suspend-decidegc = <4>;
+
+		qcom,bms-psy-name = "bms";
+		regulator-name = "smb358_otg_vreg";
+	};
+};
+
+&pm8909_chg {
+	qcom,use-external-charger;
+};
+
+&pm8909_bms {
+	status = "okay";
+	qcom,disable-bms;
+};
+
+&soc {
+	i2c_6: i2c@78ba000 {
+		compatible = "qcom,i2c-msm-v2";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg-names = "qup_phys_addr";
+		reg = <0x78ba000 0x1000>;
+		interrupt-names = "qup_irq";
+		interrupts = <0 100 0>;
+		clocks = <&clock_gcc clk_gcc_blsp1_ahb_clk>,
+			 <&clock_gcc clk_gcc_blsp1_qup6_i2c_apps_clk>;
+		clock-names = "iface_clk", "core_clk";
+		qcom,clk-freq-out = <100000>;
+		qcom,clk-freq-in  = <19200000>;
+		pinctrl-names = "i2c_active", "i2c_sleep";
+		pinctrl-0 = <&i2c_6_active>;
+		pinctrl-1 = <&i2c_6_sleep>;
+		qcom,noise-rjct-scl = <0>;
+		qcom,noise-rjct-sda = <0>;
+		dmas = <&dma_blsp1 14 64 0x20000020 0x20>,
+		       <&dma_blsp1 15 32 0x20000020 0x20>;
+		dma-names = "tx", "rx";
+		qcom,master-id = <86>;
+		status = "okay";
+
+		bq27500@55 {
+			compatible = "ti,bq27500";
+			reg = <0x55>;
+			ti,supply-name = "bms";
+		};
+	};
+
+	hall_switch {
+		compatible = "hall-switch,och175";
+		pinctrl-names = "default";
+		pinctrl-0 = <&hall_int_default>;
+
+		hall,irq-cover = <&msm_gpio 36 0x0>;
+		hall,irq-holder = <&msm_gpio 20 0x0>;
+	};
+
+	switch_camera {
+		compatible = "cameradet,switch_camera";
+		pinctrl-names = "default";
+		pinctrl-0 = <&cam_switch_default>;
+
+		switch_camera,irq-out = <&msm_gpio 28 0x0>;
+		switch_camera,irq-mvout = <&msm_gpio 97 0x0>;
+	};
+};
+
+&spi_0 {
+	status = "disabled";
+};
+
+/ {
+	aliases {
+		i2c6 = &i2c_6;
+	};
+};
+
+&msm_gpio {
+
+	hall_int_default: hall_int_default {
+		mux {
+			pins = "gpio36", "gpio20";
+			function = "gpio";
+		};
+		config {
+			pins = "gpio36", "gpio20";
+			drive-strength = <6>;
+			bias-pull-up;
+			input-enable;
+		};
+	};
+
+	cam_switch_default: cam_switch_default {
+		mux {
+			pins = "gpio28", "gpio97";
+			function = "gpio";
+		};
+		config {
+			pins = "gpio28", "gpio97";
+			drive-strength = <2>;
+			bias-pull-up;
+			input-enable;
+		};
+	};
+
+	pmx_i2c_6 {
+		i2c_6_active: i2c_6_active {
+			mux {
+				pins = "gpio10", "gpio11";
+				function = "blsp_i2c6";
+			};
+			config {
+				pins = "gpio10", "gpio11";
+				drive-strength = <2>;
+				bias-disable;
+			};
+		};
+		i2c_6_sleep: i2c_6_sleep {
+			mux {
+				pins = "gpio10", "gpio11";
+				function = "blsp_i2c6";
+			};
+			config {
+				pins = "gpio10", "gpio11";
+				drive-strength = <2>;
+				bias-disable;
+			};
+		};
+	};
+};
+
+&usb_otg {
+	qcom,hsusb-otg-mode = <1>;
+	vbus_otg-supply = <&smb358_otg_supply>;
+	extcon = <&smb358_otg_supply>;
+};
+
+&i2c_1 {
+	status = "okay";
+
+	kionix@e {
+		compatible = "kionix,kxtj9";
+		reg = <0xe>;
+		vdd-supply = <&pm8909_l17>;
+		vio-supply = <&pm8909_l6>;
+		kionix,min_interval = <5>;
+		kionix,poll_interval = <200>;
+		kionix,accel_direction = <6>;
+		kionix,accel_irq_use_drdy = <0>;
+		kionix,accel_res = <0>;
+		kionix,accel_g_range = <2>;
+	};
+
+	bosch@18 {
+		compatible = "bosch,bma2x2";
+		reg = <0x18>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <96 0x2002>;
+		vdd-supply = <&pm8909_l17>;
+		vio-supply = <&pm8909_l6>;
+		bosch,init-interval = <200>;
+		bosch,place = <4>;
+		bosch,gpio-int1 = <&msm_gpio 96 0x2002>;
+		bosch,gpio-int2 = <&msm_gpio 65 0x2002>;
+		bosch,use-hrtimer;
+	};
+
+	mcube@4c {
+		compatible = "mcube,mc3xxx";
+		reg = <0x4c>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <96 0x2002>;
+		vdd-supply = <&pm8909_l17>;
+		vio-supply = <&pm8909_l6>;
+		mcube,init-interval = <200>;
+		mcube,place = <4>;
+		mcube,use-interrupt = <0>;
+		mcube,gpio-int = <&msm_gpio 96 0x2002>;
+	};
+
+	akm@c {
+		compatible = "akm,akm09911";
+		reg = <0xc>;
+		vdd-supply = <&pm8909_l17>;
+		vio-supply = <&pm8909_l6>;
+		akm,gpio_rstn = <&msm_gpio 94 0x0>;
+		akm,layout = <7>;
+		akm,auto-report;
+		akm,use-hrtimer;
+	};
+
+	st480@f {
+		compatible = "senodia,st480";
+		reg = <0xf>;
+		vdd-supply = <&pm8909_l17>;
+		vio-supply = <&pm8909_l6>;
+	};
+
+	elan@49 {
+		compatible = "elan,epl2182";
+		reg = <0x49>;
+		vdd-supply = <&pm8909_l17>;
+		vio-supply = <&pm8909_l6>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <91 0x2002>;
+		epl2182,irq-gpio = <&msm_gpio 91 0x2002>;
+	};
+
+	si-en@68 {
+		compatible = "si-en,sn3191";
+		reg = <0x68>;
+		vdd-supply = <&pm8909_l17>;
+		vcc_i2c-supply = <&pm8909_l6>;
+		si-en,sdb-gpio = <&msm_gpio 27 0x0>;
+		si-en,led-name = "white-notification";
+		si-en,max-current-ua = <5000>;
+	};
+};
+
+&pm8909_l17 {
+	regulator-always-on;
+};
+
+&pm8909_vib {
+	status = "okay";
+	qcom,vib-timeout-ms = <15000>;
+	qcom,vib-vtg-level-mV = <3100>;
+};
+
+&vendor_fstab {
+	dev = "/dev/block/platform/soc/7824900.sdhci/by-name/cache";
+};
+
+&sdhc_2 {
+	qcom,clk-rates = <400000 25000000 50000000 100000000>;
+	qcom,devfreq,freq-table = <50000000 100000000>;
+	max-frequency = <100000000>;
+};

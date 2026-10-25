@@ -1,0 +1,559 @@
+/* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+
+#include "msm8909-mtp.dtsi"
+#include "msm8909-pm8909.dtsi"
+#include "msm8909-pm8909-mtp.dtsi"
+#include "msm8909-htc-a16-memory.dtsi"
+
+#include "msm8909-htc-a16-sensors.dtsi"
+#include "msm8909-htc-a16-camera.dtsi"
+#include "msm8909-htc-a16-display.dtsi"
+
+/ {
+	model = "HTC Desire 530";
+	compatible = "htc,msm8909-a16", "qcom,msm8909-mtp",
+			"qcom,msm8909", "qcom,mtp";
+	qcom,msm-id = <0x197 0x0 0x198 0x0 0x19a 0x0 0x1a8 0x0>;
+	qcom,board-id = <0x0 0x0>;
+};
+
+&i2c_5 {
+	status = "okay";
+
+	himax@48 {
+		compatible = "himax,852xes";
+		reg = <0x48>;
+		status = "okay";
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <13 0x2>;
+		himax,panel-coords = <0 1080 0 1920>;
+		himax,display-coords = <0 720 0 1280>;
+		himax,irq-gpio = <&msm_gpio 13 0x00>;
+		himax,rst-gpio = <&msm_gpio 12 0x00>;
+		himax,3v3-gpio = <&msm_gpio 99 0x00>;
+		report_type = <1>;
+
+		pinctrl-names = "pmx_ts_active", "pmx_ts_suspend";
+		pinctrl-0 = <&a16_ts_reset_active &a16_ts_int_active
+				&a16_ts_power_active>;
+		pinctrl-1 = <&a16_ts_reset_suspend &a16_ts_int_suspend
+				&a16_ts_power_suspend>;
+
+		config6 {
+			fw_ver = <0x19>;
+			sensor_id = <0x21>;
+			c1 = [5b 02 00 02 00 00 00 00 00 00 00];
+			c2 = [5c 02 00 12 00 00 00 00 00 00 00];
+			c3 = [5d 02 00 02 01 00 00 00 00 00 00];
+			c4 = [5e 02 00 12 00 00 00 00 00 00 00];
+			c5 = [5f 02 00 32 01 00 00 00 00 00 00];
+			c6 = [60 02 00 12 03 00 00 00 00 00 00];
+			c7 = [61 02 00 32 01 00 00 00 00 00 00];
+			c8 = [62 02 00 12 03 00 00 00 00 00 00];
+			c9 = [63 02 00 32 01 00 00 00 00 00 00];
+			c10 = [64 02 00 12 03 00 00 00 00 00 00];
+			c11 = [65 02 00 32 01 00 00 00 00 00 00];
+			c12 = [66 02 00 12 03 00 00 00 00 00 00];
+			c13 = [67 00 00 30 01 00 00 00 00 00 00];
+			c14 = [68 00 00 00 00 00 00 00 00 00 00];
+			c15 = [69 00 00 00 00 00 00 00 00 00 00];
+			c16 = [6a 00 00 20 00 00 00 00 00 00 00];
+			c17 = [6b 01 00 01 02 00 00 00 00 00 00];
+			c18 = [d5 29 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00];
+			c19 = [e1 07 01 02 02 02 03 07 03 0f 03 0f 02 0f 08];
+			c20 = [bc 08 00 00 00];
+			c21 = [c5 0a 1f 00 10 18 1a 0b 1f 02 1f];
+			c22 = [c6 18 10 1c];
+			c23 = [bd 00 0b];
+			c24 = [b9 01 05];
+			c25 = [ec 10 9e 8d];
+			c26 = [b0 00];
+			c27 = [dd 03];
+			c28 = [42 02];
+			c29 = [ce 00];
+			c30 = [ca 00];
+			c31 = [3f 00];
+			c32 = [eb 03];
+			c33 = [ba 00];
+			c34 = [bb 00];
+			c35 = [d3 06 01];
+			c36 = [37 ff 08 ff 08];
+			c37 = [a4 94 62 94 86];
+			c38 = [ed 00 04 0a 0a 04 00 00 00];
+			c39 = [cb 00 0f 0f ff ff 01 00 0f 00 32 00 ff 00];
+			c40 = [40 04 5a 5f 00 f0 10 44 00 1c 0c 0b 0c 09 09 09 0f 0f 0f 38 30 40 40 30 00 00 00 00 00 00 00 94 0a f0 11 44 00 44 22 0f 0f 83 3c 00 00 11 00 41 42 18 48 00 12 00 00 08 01 3c 64 00 00 18 37 37 05 1f 02 00 00 04 06 24 07 07 00 00 00 3d 40 0a 54 00 d8 8c 20 00 02 03 10 00 00 00 00 10 02 80 00 00 00 00 0c 10 00 20 18 03 07 0b 00 c8 78 28 00 0d 17 a0 13 00 00 02 d0 05 00 05 fe 0d 7c 66 11 08 00 bc 03 06 5b dc 0a 07 93 11 0a 6a f5 00 01 0e 04 58 5f 31 00 00 00 00 00 00 00 00 00];
+			c41 = [40 ff 0d 0e 0f 10 11 12 13 14 15 16 17 18 ff ff ff 00 01 02 03 04 05 06 07 08 09 0a 0b 0c ff ff ff 23 22 ff ff ff ff 21 20 1f 1e 1d 1c 1b 1a 19 ff ff ff ff ff ff ff 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 8f 00 00 00 00 00 00 11 c4 45 c5 48 5c 03 55 00 00 00 00 00 00 00 00 00 00];
+		};
+
+		config5 {
+			fw_ver = <0x19>;
+			sensor_id = <0x22>;
+			c1 = [5b 02 00 02 00 00 00 00 00 00 00];
+			c2 = [5c 02 00 12 00 00 00 00 00 00 00];
+			c3 = [5d 02 00 02 01 00 00 00 00 00 00];
+			c4 = [5e 02 00 12 00 00 00 00 00 00 00];
+			c5 = [5f 02 00 32 01 00 00 00 00 00 00];
+			c6 = [60 02 00 12 03 00 00 00 00 00 00];
+			c7 = [61 02 00 32 01 00 00 00 00 00 00];
+			c8 = [62 02 00 12 03 00 00 00 00 00 00];
+			c9 = [63 02 00 32 01 00 00 00 00 00 00];
+			c10 = [64 02 00 12 03 00 00 00 00 00 00];
+			c11 = [65 02 00 32 01 00 00 00 00 00 00];
+			c12 = [66 02 00 12 03 00 00 00 00 00 00];
+			c13 = [67 00 00 30 01 00 00 00 00 00 00];
+			c14 = [68 00 00 00 00 00 00 00 00 00 00];
+			c15 = [69 00 00 00 00 00 00 00 00 00 00];
+			c16 = [6a 00 00 20 00 00 00 00 00 00 00];
+			c17 = [6b 01 00 01 02 00 00 00 00 00 00];
+			c18 = [d5 29 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00];
+			c19 = [e1 07 01 02 02 02 03 07 03 0f 03 0f 02 0f 08];
+			c20 = [bc 08 00 00 00];
+			c21 = [c5 0a 1f 00 10 18 1a 0b 1f 02 1f];
+			c22 = [c6 18 10 1c];
+			c23 = [bd 00 0b];
+			c24 = [b9 01 05];
+			c25 = [ec 10 9e 8d];
+			c26 = [b0 00];
+			c27 = [dd 03];
+			c28 = [42 02];
+			c29 = [ce 00];
+			c30 = [ca 00];
+			c31 = [3f 00];
+			c32 = [eb 03];
+			c33 = [ba 00];
+			c34 = [bb 00];
+			c35 = [d3 06 01];
+			c36 = [37 ff 08 ff 08];
+			c37 = [a4 94 62 94 86];
+			c38 = [ed 00 04 0a 0a 04 00 00 00];
+			c39 = [cb 00 0f 0f ff ff 01 00 0f 00 32 00 ff 00];
+			c40 = [40 04 5a 5f 00 f0 10 44 00 1c 0c 0b 0c 09 09 09 0f 0f 0f 38 30 40 40 30 00 00 00 00 00 00 00 94 0a f0 11 44 00 44 22 0f 0f 83 3c 00 00 11 00 41 42 18 48 00 12 00 00 08 01 3c 64 00 00 18 37 37 05 1f 02 00 00 04 06 24 07 07 00 00 00 3d 40 0a 54 00 d8 8c 20 00 02 03 10 00 00 00 00 10 02 80 00 00 00 00 0c 10 00 20 18 03 07 0b 00 c8 78 28 00 0d 17 a0 13 00 00 02 d0 05 00 05 fe 0d 7c 66 11 08 00 bc 03 06 5b dc 0a 07 93 11 0a 6a f5 00 01 0e 04 58 5f 31 00 00 00 00 00 00 00 00 00];
+			c41 = [40 ff 0d 0e 0f 10 11 12 13 14 15 16 17 18 ff ff ff 00 01 02 03 04 05 06 07 08 09 0a 0b 0c ff ff ff 23 22 ff ff ff ff 21 20 1f 1e 1d 1c 1b 1a 19 ff ff ff ff ff ff ff 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 8f 00 00 00 00 00 00 11 c4 45 c5 48 5c 03 55 00 00 00 00 00 00 00 00 00 00];
+		};
+
+		config4 {
+			fw_ver = <0x17>;
+			sensor_id = <0x21>;
+			c1 = [5b 02 00 02 00 00 00 00 00 00 00];
+			c2 = [5c 02 00 12 00 00 00 00 00 00 00];
+			c3 = [5d 02 00 02 01 00 00 00 00 00 00];
+			c4 = [5e 02 00 12 00 00 00 00 00 00 00];
+			c5 = [5f 02 00 32 01 00 00 00 00 00 00];
+			c6 = [60 02 00 12 03 00 00 00 00 00 00];
+			c7 = [61 02 00 32 01 00 00 00 00 00 00];
+			c8 = [62 02 00 12 03 00 00 00 00 00 00];
+			c9 = [63 02 00 32 01 00 00 00 00 00 00];
+			c10 = [64 02 00 12 03 00 00 00 00 00 00];
+			c11 = [65 02 00 32 01 00 00 00 00 00 00];
+			c12 = [66 02 00 12 03 00 00 00 00 00 00];
+			c13 = [67 00 00 30 01 00 00 00 00 00 00];
+			c14 = [68 00 00 00 00 00 00 00 00 00 00];
+			c15 = [69 00 00 00 00 00 00 00 00 00 00];
+			c16 = [6a 00 00 20 00 00 00 00 00 00 00];
+			c17 = [6b 01 00 01 02 00 00 00 00 00 00];
+			c18 = [d5 29 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00];
+			c19 = [e1 07 01 02 02 02 02 0f 02 0f 02 0f 02 0f 08];
+			c20 = [bc 08 00 00 00];
+			c21 = [c5 0a 1f 00 10 18 1a 0b 1f 02 1f];
+			c22 = [c6 18 10 1c];
+			c23 = [bd 00 0b];
+			c24 = [b9 01 05];
+			c25 = [ec 10 9e 8d];
+			c26 = [b0 00];
+			c27 = [dd 03];
+			c28 = [42 02];
+			c29 = [ce 00];
+			c30 = [ca 00];
+			c31 = [3f 00];
+			c32 = [eb 03];
+			c33 = [ba 00];
+			c34 = [bb 00];
+			c35 = [d3 06 01];
+			c36 = [37 ff 08 ff 08];
+			c37 = [a4 94 62 94 86];
+			c38 = [ed 00 04 0a 0a 04 00 00 00];
+			c39 = [cb 00 0f 0f ff ff 01 00 0f 00 32 00 ff 00];
+			c40 = [40 03 5a 5f 00 f0 10 44 00 1c 0c 0b 0c 09 09 09 0f 0f 0f 38 30 40 40 30 00 00 00 00 00 00 00 94 0a f0 83 84 00 44 22 0f 0f 83 3c 00 00 11 00 41 42 18 48 00 12 00 00 08 01 3c 64 00 00 18 2f 2f 05 1f 02 00 00 04 06 24 07 07 00 00 00 3d 40 0a 54 00 d8 8c 20 00 02 03 10 00 00 00 00 10 02 80 00 00 00 00 0c 10 00 20 18 03 07 0b 00 c8 78 28 00 0d 17 a0 13 00 00 02 d0 05 00 05 fe 0d 7c 66 11 08 00 bc 03 06 5b dc 0a 07 93 11 0a 6a f5 00 01 0e 04 58 5f 31 00 00 00 00 00 00 00 00 00];
+			c41 = [40 ff 0d 0e 0f 10 11 12 13 14 15 16 17 18 ff ff ff 00 01 02 03 04 05 06 07 08 09 0a 0b 0c ff ff ff 23 22 ff ff ff ff 21 20 1f 1e 1d 1c 1b 1a 19 ff ff ff ff ff ff ff 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 8f 00 00 00 00 00 00 11 c4 45 c5 48 5c 03 55 00 00 00 00 00 00 00 00 00 00];
+		};
+
+		config3 {
+			fw_ver = <0x17>;
+			sensor_id = <0x22>;
+			c1 = [5b 02 00 02 00 00 00 00 00 00 00];
+			c2 = [5c 02 00 12 00 00 00 00 00 00 00];
+			c3 = [5d 02 00 02 01 00 00 00 00 00 00];
+			c4 = [5e 02 00 12 00 00 00 00 00 00 00];
+			c5 = [5f 02 00 32 01 00 00 00 00 00 00];
+			c6 = [60 02 00 12 03 00 00 00 00 00 00];
+			c7 = [61 02 00 32 01 00 00 00 00 00 00];
+			c8 = [62 02 00 12 03 00 00 00 00 00 00];
+			c9 = [63 02 00 32 01 00 00 00 00 00 00];
+			c10 = [64 02 00 12 03 00 00 00 00 00 00];
+			c11 = [65 02 00 32 01 00 00 00 00 00 00];
+			c12 = [66 02 00 12 03 00 00 00 00 00 00];
+			c13 = [67 00 00 30 01 00 00 00 00 00 00];
+			c14 = [68 00 00 00 00 00 00 00 00 00 00];
+			c15 = [69 00 00 00 00 00 00 00 00 00 00];
+			c16 = [6a 00 00 20 00 00 00 00 00 00 00];
+			c17 = [6b 01 00 01 02 00 00 00 00 00 00];
+			c18 = [d5 29 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00];
+			c19 = [e1 07 01 02 02 02 02 0f 02 0f 02 0f 02 0f 08];
+			c20 = [bc 08 00 00 00];
+			c21 = [c5 0a 1f 00 10 18 1a 0b 1f 02 1f];
+			c22 = [c6 18 10 1c];
+			c23 = [bd 00 0b];
+			c24 = [b9 01 05];
+			c25 = [ec 10 9e 8d];
+			c26 = [b0 00];
+			c27 = [dd 03];
+			c28 = [42 02];
+			c29 = [ce 00];
+			c30 = [ca 00];
+			c31 = [3f 00];
+			c32 = [eb 03];
+			c33 = [ba 00];
+			c34 = [bb 00];
+			c35 = [d3 06 01];
+			c36 = [37 ff 08 ff 08];
+			c37 = [a4 94 62 94 86];
+			c38 = [ed 00 04 0a 0a 04 00 00 00];
+			c39 = [cb 00 0f 0f ff ff 01 00 0f 00 32 00 ff 00];
+			c40 = [40 03 5a 5f 00 f0 10 44 00 1c 0c 0b 0c 09 09 09 0f 0f 0f 38 30 40 40 30 00 00 00 00 00 00 00 94 0a f0 83 84 00 44 22 0f 0f 83 3c 00 00 11 00 41 42 18 48 00 12 00 00 08 01 3c 64 00 00 18 2f 2f 05 1f 02 00 00 04 06 24 07 07 00 00 00 3d 40 0a 54 00 d8 8c 20 00 02 03 10 00 00 00 00 10 02 80 00 00 00 00 0c 10 00 20 18 03 07 0b 00 c8 78 28 00 0d 17 a0 13 00 00 02 d0 05 00 05 fe 0d 7c 66 11 08 00 bc 03 06 5b dc 0a 07 93 11 0a 6a f5 00 01 0e 04 58 5f 31 00 00 00 00 00 00 00 00 00];
+			c41 = [40 ff 0d 0e 0f 10 11 12 13 14 15 16 17 18 ff ff ff 00 01 02 03 04 05 06 07 08 09 0a 0b 0c ff ff ff 23 22 ff ff ff ff 21 20 1f 1e 1d 1c 1b 1a 19 ff ff ff ff ff ff ff 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 8f 00 00 00 00 00 00 11 c4 45 c5 48 5c 03 55 00 00 00 00 00 00 00 00 00 00];
+		};
+
+		config2 {
+			fw_ver = <0x12>;
+			sensor_id = <0x21>;
+			c1 = [5b 02 00 02 00 00 00 00 00 00 00];
+			c2 = [5c 02 00 12 00 00 00 00 00 00 00];
+			c3 = [5d 02 00 02 01 00 00 00 00 00 00];
+			c4 = [5e 02 00 12 00 00 00 00 00 00 00];
+			c5 = [5f 02 00 32 01 00 00 00 00 00 00];
+			c6 = [60 02 00 12 03 00 00 00 00 00 00];
+			c7 = [61 02 00 32 01 00 00 00 00 00 00];
+			c8 = [62 02 00 12 03 00 00 00 00 00 00];
+			c9 = [63 02 00 32 01 00 00 00 00 00 00];
+			c10 = [64 02 00 12 03 00 00 00 00 00 00];
+			c11 = [65 02 00 32 01 00 00 00 00 00 00];
+			c12 = [66 02 00 12 03 00 00 00 00 00 00];
+			c13 = [67 00 00 30 01 00 00 00 00 00 00];
+			c14 = [68 00 00 00 00 00 00 00 00 00 00];
+			c15 = [69 00 00 00 00 00 00 00 00 00 00];
+			c16 = [6a 00 00 20 00 00 00 00 00 00 00];
+			c17 = [6b 01 00 01 02 00 00 00 00 00 00];
+			c18 = [d5 29 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00];
+			c19 = [e1 05 01 02 02 02 02 0f 03 0a 03 0a 02 0f 08];
+			c20 = [bc 08 00 00 00];
+			c21 = [c5 0a 1f 00 10 19 1a 0b 1f 02 1f];
+			c22 = [c6 18 10 1c];
+			c23 = [bd 00 0b];
+			c24 = [b9 01 05];
+			c25 = [ec 10 9e 8d];
+			c26 = [b0 00];
+			c27 = [dd 03];
+			c28 = [42 02];
+			c29 = [ce 00];
+			c30 = [ca 00];
+			c31 = [3f 00];
+			c32 = [eb 03];
+			c33 = [ba 00];
+			c34 = [bb 00];
+			c35 = [d3 06 01];
+			c36 = [37 ff 08 ff 08];
+			c37 = [a4 94 62 94 86];
+			c38 = [ed 00 04 0a 0a 04 00 00 00];
+			c39 = [cb 00 0f 0f ff ff 01 00 0f 00 32 00 ff 00];
+			c40 = [40 21 5a 57 00 f0 14 44 00 1c 0c 0b 0c 08 08 08 0c 0c 0c 48 40 80 80 20 00 00 00 00 00 00 00 94 0a f0 83 84 00 48 24 0f 0f 83 3c 00 00 11 00 41 42 1f 58 00 12 00 00 08 01 3c 64 00 00 18 2f 2f 02 1f 02 00 00 04 06 24 05 05 00 00 00 d7 40 0a 54 10 9e 8d 20 00 02 03 10 00 00 00 00 10 02 80 00 00 00 00 0c 10 00 20 18 03 07 0b 00 c8 78 28 00 0d 17 a0 13 00 00 02 d0 05 00 05 fe 0d 7c 66 11 08 00 bc 03 06 5b dc 0a 07 93 11 0a 6a f5 00 01 0e 04 58 5f 31 00 00 00 00 00 00 00 00 00];
+			c41 = [40 ff 0d 0e 0f 10 11 12 13 14 15 16 17 18 ff ff ff 00 01 02 03 04 05 06 07 08 09 0a 0b 0c ff ff ff 23 22 ff ff ff ff 21 20 1f 1e 1d 1c 1b 1a 19 ff ff ff ff ff ff ff 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 8f 00 00 00 00 00 00 11 c4 45 c5 48 5c 03 55 00 00 00 00 00 00 00 00 00 00];
+		};
+
+		config1 {
+			fw_ver = <0x12>;
+			sensor_id = <0x22>;
+			c1 = [5b 02 00 02 00 00 00 00 00 00 00];
+			c2 = [5c 02 00 12 00 00 00 00 00 00 00];
+			c3 = [5d 02 00 02 01 00 00 00 00 00 00];
+			c4 = [5e 02 00 12 00 00 00 00 00 00 00];
+			c5 = [5f 02 00 32 01 00 00 00 00 00 00];
+			c6 = [60 02 00 12 03 00 00 00 00 00 00];
+			c7 = [61 02 00 32 01 00 00 00 00 00 00];
+			c8 = [62 02 00 12 03 00 00 00 00 00 00];
+			c9 = [63 02 00 32 01 00 00 00 00 00 00];
+			c10 = [64 02 00 12 03 00 00 00 00 00 00];
+			c11 = [65 02 00 32 01 00 00 00 00 00 00];
+			c12 = [66 02 00 12 03 00 00 00 00 00 00];
+			c13 = [67 00 00 30 01 00 00 00 00 00 00];
+			c14 = [68 00 00 00 00 00 00 00 00 00 00];
+			c15 = [69 00 00 00 00 00 00 00 00 00 00];
+			c16 = [6a 00 00 20 00 00 00 00 00 00 00];
+			c17 = [6b 01 00 01 02 00 00 00 00 00 00];
+			c18 = [d5 29 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00];
+			c19 = [e1 05 01 02 02 02 02 0f 03 0a 03 0a 02 0f 08];
+			c20 = [bc 08 00 00 00];
+			c21 = [c5 0a 1f 00 10 19 1a 0b 1f 02 1f];
+			c22 = [c6 18 10 1c];
+			c23 = [bd 00 0b];
+			c24 = [b9 01 05];
+			c25 = [ec 10 9e 8d];
+			c26 = [b0 00];
+			c27 = [dd 03];
+			c28 = [42 02];
+			c29 = [ce 00];
+			c30 = [ca 00];
+			c31 = [3f 00];
+			c32 = [eb 03];
+			c33 = [ba 00];
+			c34 = [bb 00];
+			c35 = [d3 06 01];
+			c36 = [37 ff 08 ff 08];
+			c37 = [a4 94 62 94 86];
+			c38 = [ed 00 04 0a 0a 04 00 00 00];
+			c39 = [cb 00 0f 0f ff ff 01 00 0f 00 32 00 ff 00];
+			c40 = [40 01 5a 57 00 f0 14 44 00 1c 0c 0b 0c 08 08 08 0c 0c 0c 48 40 80 80 20 00 00 00 00 00 00 00 94 0a f0 83 84 00 48 24 0f 0f 83 3c 00 00 11 00 41 42 1f 58 00 12 00 00 08 01 3c 64 00 00 18 2f 2f 02 1f 02 00 00 04 06 24 05 05 00 00 00 d7 40 0a 54 10 9e 8d 20 00 02 03 10 00 00 00 00 10 02 80 00 00 00 00 0c 10 00 20 18 03 07 0b 00 c8 78 28 00 0d 17 a0 13 00 00 02 d0 05 00 05 fe 0d 7c 66 11 08 00 bc 03 06 5b dc 0a 07 93 11 0a 6a f5 00 01 0e 04 58 5f 31 00 00 00 00 00 00 00 00 00];
+			c41 = [40 ff 0d 0e 0f 10 11 12 13 14 15 16 17 18 ff ff ff 00 01 02 03 04 05 06 07 08 09 0a 0b 0c ff ff ff 23 22 ff ff ff ff 21 20 1f 1e 1d 1c 1b 1a 19 ff ff ff ff ff ff ff 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 8f 00 00 00 00 00 00 11 c4 45 c5 48 5c 03 55 00 00 00 00 00 00 00 00 00 00];
+		};
+	};
+};
+
+&msm_gpio {
+	pmx_a16_ts_reset {
+		a16_ts_reset_active: a16_ts_reset_active {
+			mux {
+				pins = "gpio12";
+				function = "gpio";
+			};
+			config {
+				pins = "gpio12";
+				drive-strength = <2>;
+				bias-disable;
+			};
+		};
+
+		a16_ts_reset_suspend: a16_ts_reset_suspend {
+			mux {
+				pins = "gpio12";
+				function = "gpio";
+			};
+			config {
+				pins = "gpio12";
+				drive-strength = <2>;
+				bias-disable;
+			};
+		};
+	};
+
+	pmx_a16_ts_int {
+		a16_ts_int_active: a16_ts_int_active {
+			mux {
+				pins = "gpio13";
+				function = "gpio";
+			};
+			config {
+				pins = "gpio13";
+				drive-strength = <2>;
+				bias-disable;
+			};
+		};
+
+		a16_ts_int_suspend: a16_ts_int_suspend {
+			mux {
+				pins = "gpio13";
+				function = "gpio";
+			};
+			config {
+				pins = "gpio13";
+				drive-strength = <2>;
+				bias-disable;
+			};
+		};
+	};
+
+	pmx_a16_ts_power {
+		a16_ts_power_active: a16_ts_power_active {
+			mux {
+				pins = "gpio99";
+				function = "gpio";
+			};
+			config {
+				pins = "gpio99";
+				drive-strength = <2>;
+				bias-disable;
+			};
+		};
+
+		a16_ts_power_suspend: a16_ts_power_suspend {
+			mux {
+				pins = "gpio99";
+				function = "gpio";
+			};
+			config {
+				pins = "gpio99";
+				drive-strength = <2>;
+				bias-disable;
+			};
+		};
+	};
+};
+
+&i2c_5 {
+	synaptics@20 {
+		status = "disabled";
+	};
+};
+
+&smb1357_otg_vreg {
+	status = "disabled";
+};
+
+&pm8909_chg {
+	status = "okay";
+	qcom,use-external-charger;
+	qcom,charging-disabled;
+};
+
+&usb_otg {
+	vbus_otg-supply = <&smb358_otg_supply>;
+	extcon = <&smb358_otg_supply>;
+
+	qcom,hsusb-otg-phy-init-seq = <0x43 0x80 0x3e 0x81
+					0x3d 0x82 0x13 0x83 0xffffffff>;
+
+};
+
+&mtp_batterydata {
+	/delete-node/ qcom,palladium-batterydata;
+	#include "batterydata-htc-a16.dtsi"
+};
+
+&pm8909_bms {
+	qcom,max-voltage-uv = <4350000>;
+	qcom,r-conn-mohm = <20>;
+	qcom,s1-fifo-length = <5>;
+};
+
+&i2c_4 {
+	status = "okay";
+
+	smb358_otg_supply: smb358-charger@57 {
+		compatible = "qcom,smb358-charger";
+		reg = <0x57>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <58 8>;
+		qcom,irq-gpio = <&msm_gpio 58 0x2008>;
+		vdd-supply = <&pm8909_l5>;
+		qcom,chg-vadc = <&pm8909_vadc>;
+		qcom,chg-adc_tm = <&pm8909_adc_tm>;
+		qcom,float-voltage-mv = <4350>;
+		qcom,iterm-ma = <80>;
+		qcom,recharge-mv = <100>;
+		qcom,fastchg-current-max-ma = <1500>;
+		qcom,bms-psy-name = "bms";
+		qcom,chg-inhibit-disabled;
+		qcom,using-pmic-therm;
+
+		qcom,using-vbat-sns;
+		qcom,bms-controlled-charging;
+		qcom,charging-timeout = <764>;
+		qcom,cold-bat-decidegc = <0>;
+		qcom,cool-bat-decidegc = <100>;
+		qcom,warm-bat-decidegc = <480>;
+		qcom,hot-bat-decidegc = <550>;
+		qcom,bat-present-decidegc = <200>;
+		qcom,cool-bat-ma = <1500>;
+		qcom,warm-bat-ma = <1500>;
+		qcom,cool-bat-mv = <4350>;
+		qcom,warm-bat-mv = <4000>;
+		regulator-name = "smb358_otg_vreg";
+	};
+};
+
+&soc {
+	restart@4ab000 {
+		qcom,force-warm-reboot;
+	};
+};
+
+&soc {
+	gpio_keys {
+		compatible = "gpio-keys";
+		input-name = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&gpio_key_active>;
+
+		/delete-node/ camera_focus;
+		/delete-node/ camera_snapshot;
+
+		vol_up {
+			label = "volume_up";
+			gpios = <&msm_gpio 90 0x1>;
+			linux,input-type = <1>;
+			linux,code = <115>;
+			debounce-interval = <15>;
+			gpio-key,wakeup;
+		};
+
+	};
+};
+
+&wcnss {
+	status = "okay";
+};
+
+&vendor_fstab {
+	dev = "/dev/block/platform/soc/7824900.sdhci/by-name/cache";
+	fsmgr_flags = "wait";
+};
+
+&system_fstab {
+	status = "ok";
+	fsmgr_flags = "wait";
+};
+
+&audio_codec_mtp {
+	qcom,afe-legacy-clock-set;
+
+	htc,spk-gpio-5v-en = <&msm_gpio 10 0x0>;
+
+	qcom,msm-mbhc-hphl-swh = <1>;
+	qcom,msm-mbhc-gnd-swh = <1>;
+	qcom,msm-hs-micbias-type = "external";
+
+};
+
+&spk_vreg {
+	status = "disabled";
+};
+
+&pm8909_gpios {
+	gpio@c000 {
+		status = "okay";
+		qcom,mode = <1>;
+		qcom,invert = <0>;
+		qcom,vin-sel = <3>;
+		qcom,src-sel = <0>;
+		qcom,out-strength = <1>;
+		qcom,master-en = <1>;
+	};
+};
+
+&soc {
+	htc_radio_smem {
+		compatible = "htc,htc_radio_smem";
+		reg = <0x8e3f0000 0x10000>;
+		reg-names = "smem-start-addr";
+	};
+};

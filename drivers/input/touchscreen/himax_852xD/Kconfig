@@ -1,0 +1,8 @@
+config TOUCHSCREEN_HIMAX
+	bool "Himax HX852xD touchscreen"
+	depends on I2C
+	help
+	  Say Y here to enable support for the Himax HX852xD touch controller
+	  as wired on the HTC Desire 526 Verizon
+
+	  If unsure, say N.

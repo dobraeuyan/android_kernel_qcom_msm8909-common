@@ -1,0 +1,421 @@
+/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+
+#include "msm8909-mtp.dtsi"
+#include "8909-pm8916.dtsi"
+#include "msm8909-pm8916-mtp.dtsi"
+#include "apq8009-memory.dtsi"
+#include "dsi-panel-nt35521s-xingyuan-wxga-video.dtsi"
+#include "dsi-panel-otm1287a-kd-wxga-video.dtsi"
+#include "dsi-panel-nt35521-wxga-video.dtsi"
+#include "msm8909-x103f-camera.dtsi"
+
+/ {
+	model = "Lenovo Tab 10";
+	compatible = "lenovo,x103f", "qcom,msm8009-mtp",
+			"qcom,msm8909", "qcom,mtp";
+	qcom,msm-id = <0xf5 0x0 0x102 0x0 0x109 0x0 0x113 0x0>;
+	qcom,board-id = <0x8 0x8 0x1000b 0x8>;
+};
+
+&mdss_dsi0 {
+	qcom,dsi-pref-prim-pan = <&dsi_nt35521s_xingyuan_wxga_video>;
+};
+
+&dsi_nt35521s_xingyuan_wxga_video {
+	qcom,cont-splash-enabled;
+
+	qcom,mdss-white-point = <32768 31653 25162>;
+
+	qcom,mdss-pan-physical-width-dimension = <137>;
+	qcom,mdss-pan-physical-height-dimension = <217>;
+};
+
+&dsi_otm1287a_kd_wxga_video {
+	qcom,cont-splash-enabled;
+	qcom,mdss-pan-physical-width-dimension = <137>;
+	qcom,mdss-pan-physical-height-dimension = <217>;
+};
+
+&dsi_nt35521_wxga_video {
+	qcom,cont-splash-enabled;
+	qcom,mdss-pan-physical-width-dimension = <137>;
+	qcom,mdss-pan-physical-height-dimension = <217>;
+};
+
+&i2c_1 {
+	status = "okay";
+
+	kionix@e {
+		compatible = "kionix,kxtj2-1009";
+		reg = <0x0e>;
+		vdd-supply = <&pm8916_l17>;
+		vio-supply = <&pm8916_l6>;
+		kionix,min_interval = <5>;
+		kionix,poll_interval = <100>;
+
+		kionix,accel_direction = <6>;
+		kionix,accel_irq_use_drdy = <0>;
+		kionix,accel_res = <12>;
+		kionix,accel_g_range = <2>;
+	};
+
+	bosch@18 {
+		compatible = "bosch,bma2x2";
+		reg = <0x18>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <96 0x2002>;
+		vdd-supply = <&pm8916_l17>;
+		vio-supply = <&pm8916_l6>;
+		bosch,init-interval = <200>;
+		bosch,place = <7>;
+		bosch,gpio-int1 = <&msm_gpio 96 0x2002>;
+		bosch,gpio-int2 = <&msm_gpio 65 0x2002>;
+	};
+};
+
+&i2c_4 {
+	status = "okay";
+
+	smb358_otg_supply: smb358-charger@57 {
+		compatible = "qcom,smb358-charger";
+		reg = <0x57>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <58 8>;
+		qcom,irq-gpio = <&msm_gpio 58 0x2008>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&smb_int_default>;
+		vdd-supply = <&pm8916_l5>;
+		qcom,chg-vadc = <&pm8916_vadc>;
+		qcom,chg-adc_tm = <&pm8916_adc_tm>;
+		qcom,chg-inhibit-disabled;
+		qcom,float-voltage-mv = <4350>;
+		qcom,iterm-ma = <200>;
+		qcom,recharge-thresh-mv = <100>;
+		qcom,recharge-mv = <100>;
+		qcom,thermal-mitigation = <1500 700 600 0>;
+		qcom,fg-auto-recharge-soc = <98>;
+
+		qcom,bms-psy-name = "coulometer";
+		regulator-name = "smb358_otg_vreg";
+		qcom,cold-bat-decidegc = <0>;
+		qcom,cool-bat-decidegc = <150>;
+		qcom,warm-bat-decidegc = <450>;
+		qcom,hot-bat-decidegc = <500>;
+		qcom,bat-present-decidegc = <400>;
+		qcom,cool-bat-ma = <1300>;
+		qcom,warm-bat-ma = <1300>;
+		qcom,fastchg-current-max-ma = <2000>;
+
+		qcom,dcp-input-current-ma = <2000>;
+		qcom,cool-bat-mv = <4350>;
+		qcom,warm-bat-mv = <4100>;
+		qcom,soc-delay-worker-time = <15000>;
+	};
+};
+
+&mtp_batterydata {
+	qcom,rpull-up-kohm = <0>;
+	qcom,vref-batt-therm = <1800000>;
+
+	/delete-node/ qcom,palladium-batterydata;
+
+	qcom,qrd-4v35-2500mAh-data {
+		qcom,battery-type = "qrd_4v35_2500mah";
+		qcom,batt-id-kohm = <470>;
+		qcom,chg-term-ua = <100000>;
+		qcom,default-rbatt-mohm = <198>;
+		qcom,rbatt-capacitive-mohm = <30>;
+		qcom,fcc-mah = <7000>;
+		qcom,flat-ocv-threshold-uv = <3800000>;
+		qcom,max-voltage-uv = <4350000>;
+		qcom,v-cutoff-uv = <3400000>;
+
+		qcom,fcc-temp-lut {
+			qcom,lut-col-legend = <(-20) 0 25 40 60>;
+			qcom,lut-data = <2578 2580 2590 2584 2573>;
+		};
+
+		qcom,ibat-acc-lut {
+			qcom,lut-col-legend = <(-20) 0 25>;
+			qcom,lut-row-legend = <0 250 500 1000>;
+			qcom,lut-data = <2458 2488 2488
+					 97 2327 2434
+					 141 1798 2406
+					 191 781 2029>;
+		};
+
+		qcom,pc-temp-ocv-lut {
+			qcom,lut-col-legend = <(-20) 0 25 40 60>;
+			qcom,lut-row-legend = <100 95 90 85 80 75 70 65 60 55 50
+					       45 40 35 30 25 20 16 13 11 10 9
+					       8 7 6 5 4 3 2 1 0>;
+			qcom,lut-data =
+			<4311 4313 4318 4313 4309
+			 4212 4240 4249 4247 4243
+			 4140 4184 4191 4189 4186
+			 4098 4131 4137 4135 4132
+			 4039 4085 4086 4083 4080
+			 3950 4029 4043 4040 4033
+			 3911 3954 3979 3986 3989
+			 3873 3921 3953 3953 3951
+			 3844 3888 3916 3917 3916
+			 3823 3855 3871 3874 3873
+			 3806 3828 3836 3836 3835
+			 3791 3806 3813 3813 3812
+			 3777 3789 3796 3796 3794
+			 3763 3778 3782 3782 3780
+			 3748 3767 3771 3769 3766
+			 3733 3753 3761 3752 3739
+			 3715 3734 3743 3733 3719
+			 3697 3716 3721 3712 3699
+			 3679 3706 3698 3690 3677
+			 3665 3699 3689 3682 3670
+			 3656 3696 3688 3681 3669
+			 3644 3692 3687 3679 3668
+			 3632 3688 3685 3678 3666
+			 3616 3683 3683 3676 3664
+			 3597 3673 3678 3669 3657
+			 3571 3651 3661 3650 3634
+			 3537 3613 3623 3608 3593
+			 3489 3555 3565 3549 3535
+			 3415 3470 3485 3468 3458
+			 3272 3330 3367 3347 3342
+			 3000 3000 3000 3000 3000>;
+		};
+
+		qcom,rbatt-sf-lut {
+			qcom,lut-col-legend = <(-20) 0 25 40 60>;
+			qcom,lut-row-legend = <100 95 90 85 80 75 70 65 60 55 50
+					       45 40 35 30 25 20 16 13 11 10 9
+					       8 7 6 5 4 3 2 1 0>;
+			qcom,lut-data =
+			<905 231 100 90 90
+			 905 231 100 90 90
+			 961 229 100 90 90
+			 915 227 101 91 91
+			 863 227 102 92 91
+			 787 231 106 95 92
+			 771 208 106 95 93
+			 758 207 111 97 94
+			 754 202 113 100 97
+			 760 198 105 97 95
+			 768 198 98 90 91
+			 781 199 98 90 91
+			 800 201 99 91 91
+			 825 208 100 93 93
+			 855 217 101 94 94
+			 896 227 102 91 91
+			 948 236 101 91 91
+			 997 246 102 92 92
+			 1026 260 100 91 91
+			 977 259 100 91 91
+			 1005 265 101 92 92
+			 1035 275 102 93 93
+			 1069 287 103 94 94
+			 1108 300 106 96 95
+			 1190 312 109 97 96
+			 1371 323 108 96 94
+			 1641 339 107 94 93
+			 2086 371 109 96 95
+			 3035 421 115 102 99
+			 15561 627 138 124 112
+			 21302 697 367 235 160>;
+		};
+	};
+};
+
+&pm8916_bms {
+	status = "okay";
+	qcom,battery-data = <&mtp_batterydata>;
+	qcom,v-cutoff-uv = <3450000>;
+	qcom,max-voltage-uv = <4350000>;
+	qcom,shutdown-soc-valid-limit = <30>;
+	qcom,low-voltage-calculate-soc-ms = <30000>;
+	qcom,low-soc-calculate-soc-ms = <80000>;
+	qcom,calculate-soc-ms = <110000>;
+	qcom,low-voltage-threshold = <3550000>;
+	qcom,resume-soc = <95>;
+	qcom,use-reported-soc;
+	qcom,force-bms-active-on-charger;
+	qcom,batt-aging-comp;
+};
+
+&msm_gpio {
+	ctp_eint_as_int: ctp_eint_as_int {
+		mux {
+			pins = "gpio13";
+			function = "gpio";
+		};
+		config {
+			pins = "gpio13";
+			drive-strength = <8>;
+			input-enable;
+			bias-disable;
+		};
+	};
+
+	ctp_eint_output_low: ctp_eint_output_low {
+		mux {
+			pins = "gpio13";
+			function = "gpio";
+		};
+		config {
+			pins = "gpio13";
+			drive-strength = <8>;
+			bias-pull-down;
+			output-low;
+		};
+	};
+
+	ctp_eint_output_high: ctp_eint_output_high {
+		mux {
+			pins = "gpio13";
+			function = "gpio";
+		};
+		config {
+			pins = "gpio13";
+			drive-strength = <8>;
+			bias-pull-up;
+			output-high;
+		};
+	};
+
+	spk_ext_pa_active: spk_ext_pa_active {
+		mux {
+			pins = "gpio97", "gpio20";
+			function = "gpio";
+		};
+		config {
+			pins = "gpio97", "gpio20";
+			drive-strength = <8>;
+			bias-disable;
+			output-low;
+			input-enable;
+		};
+	};
+};
+
+&i2c_5 {
+	status = "okay";
+
+	synaptics@20 {
+		status = "disabled";
+	};
+
+	Goodix-TS@14 {
+		compatible = "goodix,Goodix-TS";
+		reg = <0x14>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <13 0x2008>;
+		vdd-supply = <&pm8916_l17>;
+		vcc_i2c-supply = <&pm8916_l6>;
+		pinctrl-names = "eint_as_int", "eint_output_low",
+				"eint_output_high";
+		pinctrl-0 = <&ctp_eint_as_int>;
+		pinctrl-1 = <&ctp_eint_output_low>;
+		pinctrl-2 = <&ctp_eint_output_high>;
+		goodix,reset-gpio = <&msm_gpio 12 0x00>;
+		goodix,display-coords = <0 0 1280 800>;
+		goodix,panel-coords = <0 0 1280 800>;
+		goodix,irq-gpio = <&msm_gpio 13 0x00>;
+		goodix,button-map = <158 139 172>;
+		goodix,i2c-pull-up;
+		status = "ok";
+	};
+
+	focaltech@38 {
+		compatible = "focaltech,FT5x36";
+		reg = <0x38>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <13 0x2>;
+		vdd-supply = <&pm8916_l17>;
+		vcc_i2c-supply = <&pm8916_l6>;
+		pinctrl-names = "pmx_ts_active", "pmx_ts_suspend";
+		pinctrl-0 = <&ts_int_active &ts_reset_active>;
+		pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
+		focaltech,family-id = <0x8>;
+		focaltech,reset-gpio = <&msm_gpio 12 0x0>;
+		focaltech,irq-gpio = <&msm_gpio 13 0x0>;
+		focaltech,max_touch_point = <10>;
+		focaltech,display-coords = <0 0 800 1280>;
+		focaltech,panel-coords = <0 0 800 1280>;
+		focaltech,button-map = <139 172 158>;
+		focaltech,no-force-update;
+		focaltech,i2c-pull-up;
+		focaltech,auto_clb;
+	};
+};
+
+&wcnss {
+	status = "okay";
+};
+
+&sdhc_2 {
+	cd-gpios = <&msm_gpio 38 0x0>;
+	vdd-enable-gpios = <&msm_gpio 17 0x0>;
+};
+
+&usb_otg {
+	vbus_otg-supply = <&smb358_otg_supply>;
+	extcon = <&smb358_otg_supply>;
+};
+
+&vendor_fstab {
+	dev = "/dev/block/platform/soc/7824900.sdhci/by-name/cache";
+};
+
+&audio_codec_mtp {
+	qcom,msm-mbhc-hphl-swh = <1>;
+	qcom,msm-mbhc-gnd-swh = <0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&spk_ext_pa_active>;
+
+	qcom,afe-legacy-clock-set;
+
+	qcom,msm-spk-ext-pa = <&msm_gpio 97 0>;
+	qcom,msm-spk-ext-pa-left = <&msm_gpio 97 0>;
+	qcom,msm-spk-ext-pa-right = <&msm_gpio 20 0>;
+
+	qcom,cdc-us-euro-gpios = <&msm_gpio 16 0>;
+	/delete-property/ qcom,cdc-us-eu-gpios;
+
+	/delete-property/ qcom,msm-micbias1-ext-cap;
+	qcom,audio-routing =
+		"RX_BIAS", "MCLK",
+		"SPK_RX_BIAS", "MCLK",
+		"INT_LDO_H", "MCLK",
+		"MIC BIAS Internal1", "Handset Mic",
+		"MIC BIAS Internal2", "Headset Mic",
+		"MIC BIAS Internal3", "Secondary Mic",
+		"AMIC1", "MIC BIAS Internal1",
+		"AMIC2", "MIC BIAS Internal2",
+		"AMIC3", "MIC BIAS Internal3";
+};
+
+&cdc_us_euro_sw {
+	status = "disabled";
+};
+
+&i2c_2 {
+	nq@28 {
+		status = "disabled";
+	};
+
+	couloMeter@55 {
+		compatible = "ti,bq27500";
+		reg = <0x55>;
+		ti,supply-name = "coulometer";
+	};
+};

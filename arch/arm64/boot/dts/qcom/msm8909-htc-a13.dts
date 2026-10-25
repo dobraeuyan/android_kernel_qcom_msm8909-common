@@ -1,0 +1,304 @@
+/* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+
+#include "msm8909-mtp.dtsi"
+#include "msm8909-pm8909.dtsi"
+#include "msm8909-pm8909-mtp.dtsi"
+#include "msm8909-htc-a13-memory.dtsi"
+
+#include "msm8909-htc-a13-display.dtsi"
+#include "msm8909-htc-a13-sensors.dtsi"
+#include "msm8909-htc-a13-camera.dtsi"
+#include "msm8909-htc-a13-audio.dtsi"
+
+/ {
+	model = "HTC Desire 526 (Verizon)";
+	compatible = "htc,msm8909-a13", "qcom,msm8909-mtp",
+			"qcom,msm8909", "qcom,mtp";
+	qcom,msm-id = <0x185 0x0 0x188 0x0 0x189 0x0>;
+	qcom,board-id = <0x0 0x0>;
+};
+
+&soc {
+	restart@4ab000 {
+		qcom,force-warm-reboot;
+	};
+};
+
+&vendor_fstab {
+	dev = "/dev/block/platform/soc/7824900.sdhci/by-name/cache";
+	fsmgr_flags = "wait";
+};
+
+&system_fstab {
+	status = "ok";
+	fsmgr_flags = "wait";
+};
+
+&i2c_5 {
+	status = "okay";
+
+	himax@48 {
+			compatible = "himax,8528d";
+			reg = <0x48>;
+			interrupt-parent = <&msm_gpio>;
+			interrupts = <0x0d 0x02>;
+			himax,panel-coords = <0x00 0x32a 0x00 0x5a0>;
+			himax,display-coords = <0x00 0x21c 0x00 0x3c0>;
+			himax,irq-gpio = <&msm_gpio 0x0d 0x00>;
+			himax,rst-gpio = <&msm_gpio 0x0c 0x00>;
+			himax,3v3-gpio = <&msm_gpio 0x63 0x00>;
+			report_type = <0x01>;
+			pinctrl-names = "pmx_ts_active\0pmx_ts_suspend";
+			pinctrl-0 = <&a13_ts_reset_active &a13_ts_int_active &a13_ts_power_active>;
+			pinctrl-1 = <&a13_ts_reset_suspend &a13_ts_int_suspend &a13_ts_power_suspend>;
+			config1 {
+				fw_ver = <0xc1>;
+				sensor_id = <0x21>;
+				c1 = [37 ff 08 ff 08];
+				c2 = [3f];
+				c3 = [62 02 00 02 00 00 00 00 00 11 11];
+				c4 = [63 02 00 32 00 00 00 00 00 11 11];
+				c5 = [64 02 00 32 00 00 00 00 00 11 11];
+				c6 = [65 02 00 32 00 00 00 00 00 11 11];
+				c7 = [66 02 00 02 03 00 00 00 00 22 22];
+				c8 = [67 02 00 02 03 00 00 00 00 11 11];
+				c9 = [68 02 00 02 03 00 00 00 00 00 00];
+				c10 = [69 02 00 02 03 00 00 00 00 00 00];
+				c11 = [6a 00 00 30 02 00 00 00 00 00 00];
+				c12 = [6b 00 00 30 02 00 00 00 00 00 00];
+				c13 = [6c 00 00 30 02 00 00 00 00 00 00];
+				c14 = [6d 00 00 00 02 00 00 00 00 00 00];
+				c15 = [6e 00 00 00 02 00 00 00 00 00 00];
+				c16 = [6f 01 00 21 00 00 00 00 00 00 00];
+				c17 = [70 01 00 31 00 00 00 00 00 00 00];
+				c18 = [7b 03];
+				c19 = <0x7c00d80c>;
+				c20 = [7f 00 04 0a 0a 04 00 00 00];
+				c21 = [a4 94 62 94 86];
+				c22 = [b4 08 01 01 01 01 03 07 04 0f 04 0f 04 0f 08];
+				c23 = [b9 01 36];
+				c24 = [ba 00];
+				c25 = [bb 00];
+				c26 = [bc 00 00 00 00];
+				c27 = [bd 04 0c];
+				c28 = [c2 10 00 00 00 00 00 00 00];
+				c29 = [c5 09 18 00 10 1b 1e 0b 1e 08 16];
+				c30 = <0xc61b101a>;
+				c31 = [c9 00 00 00 22 21 20 1d 1c 1b 1a 19 18 2d 29 28 27 26 25 24 23 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00];
+				c32 = [cb 01 f5 ff ff 01 00 05 00 9f 00 00 00];
+				c33 = [d0 06 01];
+				c34 = [d3 06 01];
+				c35 = [d5 29 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00];
+				c36 = [40 21 5a 5f 00 f2 10 00 00 1c 0f 0f 0f 09 09 09 0f 0f 0f 2f 2f 28 28 38 00 00 00 00 00 00 00];
+				c37 = [40 74 0a f0 84 85 00 20 10 0f 0f 83 3c 00 00 11 11 41 42 18 48 00 18 00 00 10 01 3c 64 00 00];
+				c38 = [40 20 37 37 05 28 00 00 00 04 06 24 08 08 00 00 00];
+				c39 = [40 30 46 05 00 00 d8 0c 00 00 02 03 00 00 00 00 00 10 02 80 00 00 00 00 0c];
+				c40 = [40 00 00 00 00 00 00 00 00 be 82 28 00 0a 11 a0 13 00 00 03 2a 05 a0];
+				c41 = [40 0b ab 13 b1 66 e1 08 02 09 06 1c 60 d6 0a 0f 6a 1a 03 6d 66 00 02 df 08 9c 65 6b 00];
+				c42 = [40 07 04 00 00 00 00 00 00];
+				c43_1 = <0x40ff02ff 0xffff030e 0xffff040c 0xffff050a 0xffff0619 0xffff0717 0xffff0815 0xffff0913>;
+				c43_2 = [40 ff ff 1a 11 ff ff 18 0f ff ff 16 0d ff ff 14 ff ff ff 12 ff ff 00 10 ff ff 01 ff 0b ff];
+				c44_1 = <0x403300c0 0x190a28 0x00 0x00 0x00 0x11c445 0xc5485c03 0x5c>;
+				c44_2 = [40 03 11 03 05 18];
+				c45 = [40 00 00];
+			};
+
+			config0 {
+				fw_ver = <0xc1>;
+				sensor_id = <0x11>;
+				c1 = [37 ff 08 ff 08];
+				c2 = [3f];
+				c3 = [62 02 00 02 00 00 00 00 00 11 11];
+				c4 = [63 02 00 32 00 00 00 00 00 11 11];
+				c5 = [64 02 00 32 00 00 00 00 00 11 11];
+				c6 = [65 02 00 32 00 00 00 00 00 01 11];
+				c7 = [66 02 00 02 03 00 00 00 00 21 22];
+				c8 = [67 02 00 02 03 00 00 00 00 11 00];
+				c9 = [68 02 00 02 03 00 00 00 00 00 00];
+				c10 = [69 02 00 02 03 00 00 00 00 00 00];
+				c11 = [6a 00 00 30 02 00 00 00 00 00 00];
+				c12 = [6b 00 00 30 02 00 00 00 00 00 00];
+				c13 = [6c 00 00 30 02 00 00 00 00 00 00];
+				c14 = [6d 00 00 00 02 00 00 00 00 00 00];
+				c15 = [6e 00 00 00 02 00 00 00 00 00 00];
+				c16 = [6f 01 00 21 00 00 00 00 00 00 00];
+				c17 = [70 01 00 31 00 00 00 00 00 00 00];
+				c18 = [7b 03];
+				c19 = <0x7c00d80c>;
+				c20 = [7f 00 04 0a 0a 04 00 00 00];
+				c21 = [a4 94 62 94 86];
+				c22 = [b4 08 01 01 01 01 03 07 04 0f 04 0f 04 0f 08];
+				c23 = [b9 01 36];
+				c24 = [ba 00];
+				c25 = [bb 00];
+				c26 = [bc 00 00 00 00];
+				c27 = [bd 04 0c];
+				c28 = [c2 10 00 00 00 00 00 00 00];
+				c29 = [c5 09 1e 00 10 1b 1e 0b 1e 08 16];
+				c30 = <0xc619101a>;
+				c31 = [c9 00 00 00 22 21 20 1d 1c 1b 1a 19 18 2d 29 28 27 26 25 24 23 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00];
+				c32 = [cb 01 f5 ff ff 01 00 05 00 9f 00 00 00];
+				c33 = [d0 06 01];
+				c34 = [d3 06 01];
+				c35 = [d5 29 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00];
+				c36 = [40 04 5a 5f 00 f2 10 00 00 1c 0f 0f 0f 09 09 09 0f 0f 0f 2f 2f 28 28 38 00 00 00 00 00 00 00];
+				c37 = [40 74 0a f0 84 85 00 20 10 0f 0f 83 3c 00 00 11 11 c1 42 18 48 00 18 00 00 10 01 3c 64 00 00];
+				c38 = [40 10 37 37 05 40 00 00 00 04 06 24 08 08 00 00 00];
+				c39 = [40 30 46 05 00 00 d8 0c 00 00 02 03 00 00 00 00 00 10 02 80 00 00 00 00 0c];
+				c40 = [40 00 00 00 00 00 00 00 00 be 82 28 00 0a 11 a0 13 00 00 03 2a 05 a0];
+				c41 = [40 0b ab 13 b1 66 e1 08 02 09 06 1c 60 d6 0a 0f 6a 1a 03 6d 66 00 02 df 08 9c 65 6b 00];
+				c42 = [40 05 04 04 00 00 00 00 00];
+				c43_1 = <0x40ff02ff 0xffff030e 0xffff040c 0xffff050a 0xffff0619 0xffff0717 0xffff0815 0xffff0913>;
+				c43_2 = [40 ff ff 1a 11 ff ff 18 0f ff ff 16 0d ff ff 14 ff ff ff 12 ff ff 00 10 ff ff 01 ff 0b ff];
+				c44_1 = <0x403300c0 0x190a28 0x00 0x00 0x00 0x11c445 0xf5485c03 0x5c>;
+				c44_2 = [40 03 11 03 05 18];
+				c45 = [40 00 00];
+			};
+		};
+
+	synaptics@20 {
+		status = "disabled";
+	};
+};
+
+&msm_gpio {
+	pmx_a13_ts_reset {
+		a13_ts_reset_active: a13_ts_reset_active {
+			mux { pins = "gpio12"; function = "gpio"; };
+			config { pins = "gpio12"; drive-strength = <2>; bias-disable; };
+		};
+
+		a13_ts_reset_suspend: a13_ts_reset_suspend {
+			mux { pins = "gpio12"; function = "gpio"; };
+			config { pins = "gpio12"; drive-strength = <2>; bias-disable; };
+		};
+	};
+
+	pmx_a13_ts_int {
+		a13_ts_int_active: a13_ts_int_active {
+			mux { pins = "gpio13"; function = "gpio"; };
+			config { pins = "gpio13"; drive-strength = <2>; bias-disable; };
+		};
+
+		a13_ts_int_suspend: a13_ts_int_suspend {
+			mux { pins = "gpio13"; function = "gpio"; };
+			config { pins = "gpio13"; drive-strength = <2>; bias-disable; };
+		};
+	};
+
+	pmx_a13_ts_power {
+		a13_ts_power_active: a13_ts_power_active {
+			mux { pins = "gpio99"; function = "gpio"; };
+			config { pins = "gpio99"; drive-strength = <2>; bias-disable; };
+		};
+
+		a13_ts_power_suspend: a13_ts_power_suspend {
+			mux { pins = "gpio99"; function = "gpio"; };
+			config { pins = "gpio99"; drive-strength = <2>; bias-disable; };
+		};
+	};
+};
+
+&smb1357_otg_vreg {
+	status = "disabled";
+};
+
+&pm8909_chg {
+	status = "okay";
+	qcom,use-external-charger;
+	qcom,charging-disabled;
+};
+
+&pm8909_bms {
+	qcom,max-voltage-uv = <4350000>;
+	qcom,r-conn-mohm = <20>;
+	qcom,s1-fifo-length = <5>;
+};
+
+&mtp_batterydata {
+	/delete-node/ qcom,palladium-batterydata;
+	#include "batterydata-htc-a13.dtsi"
+};
+
+&usb_otg {
+	vbus_otg-supply = <&smb358_otg_supply>;
+	extcon = <&smb358_otg_supply>;
+
+	qcom,hsusb-otg-phy-init-seq = <0x33 0x80 0x1f 0x81
+					0x3d 0x82 0x13 0x83 0xffffffff>;
+};
+
+&i2c_4 {
+	smb358_otg_supply: smb358-charger@57 {
+		compatible = "qcom,smb358-charger";
+		reg = <0x57>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <58 8>;
+		qcom,irq-gpio = <&msm_gpio 58 0x2008>;
+		vdd-supply = <&pm8909_l5>;
+		qcom,chg-vadc = <&pm8909_vadc>;
+		qcom,chg-adc_tm = <&pm8909_adc_tm>;
+		qcom,float-voltage-mv = <4350>;
+		qcom,iterm-ma = <80>;
+		qcom,recharge-mv = <300>;
+		qcom,fastchg-current-max-ma = <1300>;
+		qcom,bms-psy-name = "bms";
+		qcom,chg-inhibit-disabled;
+		qcom,using-pmic-therm;
+
+		qcom,using-vbat-sns;
+		qcom,bms-controlled-charging;
+		qcom,charging-timeout = <764>;
+		qcom,cold-bat-decidegc = <0>;
+		qcom,cool-bat-decidegc = <100>;
+		qcom,warm-bat-decidegc = <480>;
+		qcom,hot-bat-decidegc = <550>;
+		qcom,bat-present-decidegc = <200>;
+		qcom,cool-bat-ma = <1300>;
+		qcom,warm-bat-ma = <1300>;
+		qcom,cool-bat-mv = <4350>;
+		qcom,warm-bat-mv = <4000>;
+		regulator-name = "smb358_otg_vreg";
+	};
+};
+
+&soc {
+	gpio_keys {
+		compatible = "gpio-keys";
+		input-name = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&gpio_key_active>;
+
+		/delete-node/ camera_focus;
+		/delete-node/ camera_snapshot;
+
+		vol_up {
+			label = "volume_up";
+			gpios = <&msm_gpio 90 0x1>;
+			linux,input-type = <1>;
+			linux,code = <115>;
+			debounce-interval = <15>;
+			gpio-key,wakeup;
+		};
+	};
+};
+
+&soc {
+	htc_radio_smem {
+		compatible = "htc,htc_radio_smem";
+		reg = <0x8e3f0000 0x10000>;
+		reg-names = "smem-start-addr";
+	};
+};

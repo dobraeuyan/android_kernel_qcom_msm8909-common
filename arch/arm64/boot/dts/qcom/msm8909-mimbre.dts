@@ -1,0 +1,43 @@
+/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+
+#include "msm8909-yt3-common.dtsi"
+
+#include "dsi-panel-auoOTM1287A-800p-video.dtsi"
+#include "dsi-panel-boeNT35523B-800p-video.dtsi"
+#include "dsi-panel-hx8394d-720p-video.dtsi"
+
+/ {
+	model = "Lenovo Yoga Tab 3 10.1";
+	compatible = "lenovo,mimbre", "qcom,msm8909-qrd",
+		     "qcom,msm8909", "qcom,qrd";
+	qcom,msm-id = <0xf5 0x0 0x102 0x0 0x109 0x0 0x113 0x0>;
+	qcom,board-id = <0x1000b 0x9>;
+};
+
+&mdss_dsi0 {
+	qcom,dsi-pref-prim-pan = <&dsi_boent35523b_800p_vid>;
+};
+
+&dsi_hx8394d_720_vid {
+	qcom,cont-splash-enabled;
+};
+
+&smb358_otg_supply {
+	qcom,float-voltage-mv = <4220>;
+};
+
+&i2c_1 {
+	/delete-node/ mcube@4c;
+};
