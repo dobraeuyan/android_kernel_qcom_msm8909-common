@@ -580,9 +580,6 @@ static long msm_sensor_config_legacy_htc(struct msm_sensor_ctrl_t *s_ctrl,
 	memset(&cdata, 0, sizeof(cdata));
 	cdata.cfgtype = hcdata->cfgtype;
 
-	pr_err("DIAG htc_cfg: entered argp=%p cfgtype=%d (%#x)\n",
-		argp, cdata.cfgtype, cdata.cfgtype);
-
 	if (cdata.cfgtype == CFG_GET_SENSOR_INFO) {
 		long rc = s_ctrl->func_tbl->sensor_config(s_ctrl, &cdata);
 		if (rc < 0)
@@ -659,8 +656,6 @@ static long msm_sensor_subdev_ioctl(struct v4l2_subdev *sd,
 		pr_err("%s s_ctrl NULL\n", __func__);
 		return -EBADF;
 	}
-	pr_err("DIAG subdev_ioctl: cmd=%#x s_ctrl=%p argp=%p\n",
-		cmd, s_ctrl, argp);
 	switch (cmd) {
 	case VIDIOC_MSM_SENSOR_CFG_LEGACY_M:
 		return msm_sensor_config_legacy_m(s_ctrl, argp);

@@ -1739,9 +1739,6 @@ static long msm_actuator_subdev_ioctl(struct v4l2_subdev *sd,
 
 	CDBG("Enter\n");
 	CDBG("%s:%d a_ctrl %pK argp %pK\n", __func__, __LINE__, a_ctrl, argp);
-	pr_err("DIAG act_io: cmd=%#010x  (nuestro CFG=%#010x nr=%d) cfgtype=%d\n",
-		cmd, VIDIOC_MSM_ACTUATOR_CFG, BASE_VIDIOC_PRIVATE + 6,
-		argp ? ((struct msm_actuator_cfg_data *)argp)->cfgtype : -999);
 	switch (cmd) {
 	case VIDIOC_MSM_SENSOR_GET_SUBDEV_ID:
 		return msm_actuator_get_subdev_id(a_ctrl, argp);
