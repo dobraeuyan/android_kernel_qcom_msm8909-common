@@ -382,6 +382,12 @@ static struct sensors_classdev epl88051_ps_cdev = {
 	.min_delay = 0,
 	.fifo_reserved_event_count = 0,
 	.fifo_max_event_count = 0,
+	/*
+	 * wake-up + on-change: SensorManager.getDefaultSensor(TYPE_PROXIMITY)
+	 * solo acepta sensores wake-up; sin este bit DisplayPowerController
+	 * deja mProximitySensor=null y no apaga la pantalla en llamada.
+	 */
+	.flags = 3,
 	.enabled = 0,
 	.delay_msec = 200,
 	.sensors_enable = NULL,
@@ -408,7 +414,7 @@ static DECLARE_DELAYED_WORK(polling_work, epl_sensor_polling_work);
 
 static void epl_sensor_revive_work(struct work_struct *work);
 static void epl_sensor_arm_revive_check(struct epl_sensor_priv *epld);
-/* static void epl_sensor_keepalive_work(struct work_struct *work); */
+static void epl_sensor_keepalive_work(struct work_struct *work);
 
 #if PS_DYN_K
 void epl_sensor_dynk_thd_polling_work(struct work_struct *work);
@@ -1425,7 +1431,7 @@ static void epl_sensor_arm_revive_check(struct epl_sensor_priv *epld)
  * ~0 consumo. Si aun asi se cuelga, el read falla en silencio (los wrappers
  * reintentan x3) y solo un power-cycle lo recupera — queda documentado.
  */
-/*static void epl_sensor_keepalive_work(struct work_struct *work)
+static void epl_sensor_keepalive_work(struct work_struct *work)
 {
 	struct epl_sensor_priv *epld =
 		container_of(work, struct epl_sensor_priv, keepalive_work.work);
@@ -1440,7 +1446,7 @@ static void epl_sensor_arm_revive_check(struct epl_sensor_priv *epld)
 		mutex_unlock(&sensor_mutex);
 	}
 	schedule_delayed_work(&epld->keepalive_work, msecs_to_jiffies(2000));
-}*/
+}
 
 static void set_als_ps_intr_type(struct i2c_client *client, bool ps_polling, bool als_polling)
 {
@@ -4240,7 +4246,7 @@ static DEVICE_ATTR(ls_gadc, 0664, ls_gadc_show, ls_gadc_store);
 static DEVICE_ATTR(ls_adc_table, 0664, ls_adc_table_show, ls_adc_table_store);
 static DEVICE_ATTR(ls_flevel, 0664, ls_fLevel_show, ls_fLevel_store);
 static DEVICE_ATTR(ls_dark_level, 0664, ls_dark_level_show, ls_dark_level_store);
-static DEVICE_ATTR(ls_update_table, 0664, ls_update_table_show, NULL);
+static DEVICE_ATTR(ls_update_table, 0444, ls_update_table_show, NULL);
 static DEVICE_ATTR(ls_flush, 0664, ls_flush_show, ls_flush_store);
 #endif
 /*----------------------------------------------------------------------------*/
@@ -5285,6 +5291,63 @@ static int lightsensor_update_table(struct epl_sensor_priv *epld)
 #endif
 /*----------------------------------------------------------------------------*/
 /*
+ * Los sensores on-change deben entregar su valor actual al activarse. Sin
+ * esto, quien registra ALS o PS con el estado estable no recibe nada hasta
+ * el primer cruce de umbral: la fila sale vacía y ambos sensores "aparecen"
+ * a la vez al acercar la mano. El HAL QTI no sintetiza el evento; el driver
+ * tiene que hacerlo.
+ *
+ * Ojo: input_handle_abs_event() (drivers/input/input.c) descarta cualquier
+ * EV_ABS cuyo valor no cambió respecto al último reportado; el evento moriría
+ * antes de llegar al evdev del HAL. Invalidar la caché absinfo fuerza el paso.
+ */
+static void epl88051_force_report_abs(struct input_dev *dev, unsigned int code,
+				      int value)
+{
+	dev->absinfo[code].value = -1;
+	input_report_abs(dev, code, value);
+	input_sync(dev);
+}
+
+static void epl88051_report_initial_als(struct epl_sensor_priv *epld)
+{
+	int lux;
+
+	msleep(50);	/* una conversión completa tras epl_sensor_update_mode() */
+	mutex_lock(&sensor_mutex);
+	epl_sensor_read_als(epld->client);
+	lux = epl_sensor_get_als_value(epld, epl_sensor.als.data.channels[1]);
+	mutex_unlock(&sensor_mutex);
+
+	LOG_INFO("[LS][epl88051] initial report: lux=%d\n", lux);
+	epl88051_force_report_abs(epld->als_input_dev, ABS_MISC, lux);
+}
+
+static void epl88051_report_initial_ps(struct epl_sensor_priv *epld)
+{
+	int adc, status;
+	u32 thd;
+
+	msleep(50);
+	mutex_lock(&sensor_mutex);
+	epl_sensor_read_ps_status(epld->client);
+	epl_sensor_read_ps(epld->client);
+	mutex_unlock(&sensor_mutex);
+
+	adc = epl_sensor.ps.data.data;
+	status = epl_sensor.ps.compare_low >> 3;
+	if (!status && !(epl_sensor.ps.compare_high >> 4)) {
+		/* comparadores aún sin resolver: usar el umbral NEAR */
+		thd = dynk_thd_high ? dynk_thd_high : 500;
+		status = (adc >= thd) ? 0 : 1;
+	}
+
+	LOG_INFO("[PS][epl88051] initial report: %s, ps_adc=%d\n",
+		 status ? "FAR" : "NEAR", adc);
+	epl88051_force_report_abs(epld->ps_input_dev, ABS_DISTANCE, status);
+}
+/*----------------------------------------------------------------------------*/
+/*
  * Injerto 4.9: callbacks de sensors_classdev. Puentean las escrituras del HAL
  * en /sys/class/sensors/<n>/{enable,poll_delay} sobre las MISMAS rutas que ya
  * usaban los sysfs de fábrica ls_enable_store()/ps_enable_store(), para no
@@ -5324,6 +5387,8 @@ static int epl88051_als_set_enable(struct sensors_classdev *sensors_cdev,
 	epld->ls_calibrate = 0;
 	if (enable)
 		epl_sensor_arm_revive_check(epld);	/* 20260913: auto-revive */
+	if (enable)
+		epl88051_report_initial_als(epld);
 
 	LOG_INFO("[LS][epl88051] classdev enable=%u\n", enable);
 	return 0;
@@ -5368,6 +5433,8 @@ static int epl88051_ps_set_enable(struct sensors_classdev *sensors_cdev,
 	}
 	if (enable)
 		epl_sensor_arm_revive_check(epld);	/* 20260913: auto-revive */
+	if (enable)
+		epl88051_report_initial_ps(epld);
 
 	LOG_INFO("[PS][epl88051] classdev enable=%u\n", enable);
 	return 0;
@@ -5466,6 +5533,7 @@ static int epl_sensor_probe(struct i2c_client *client,const struct i2c_device_id
 	INIT_DELAYED_WORK(&epld->eint_work, epl_sensor_eint_work);
 	INIT_DELAYED_WORK(&epld->polling_work, epl_sensor_polling_work);
 	INIT_DELAYED_WORK(&epld->revive_work, epl_sensor_revive_work);
+	INIT_DELAYED_WORK(&epld->keepalive_work, epl_sensor_keepalive_work);
 	epld->irq_seen = false;
 	epld->revive_tries = 0;
 #if PS_DYN_K
@@ -5703,6 +5771,7 @@ err_create_ls_device:
 	class_destroy(epld->epl_sensor_class);
 err_create_class:
 	cancel_delayed_work_sync(&epld->revive_work);
+	cancel_delayed_work_sync(&epld->keepalive_work);
 	destroy_workqueue(epld->lp_wq);
 #endif
 err_fail:
@@ -5729,6 +5798,7 @@ static int epl_sensor_remove(struct i2c_client *client)
 
     dev_dbg(&client->dev, "%s: enter.\n", __func__);
     cancel_delayed_work_sync(&epld->revive_work);
+    cancel_delayed_work_sync(&epld->keepalive_work);
 #if defined(CONFIG_HAS_EARLYSUSPEND)
     unregister_early_suspend(&epld->early_suspend);
 #endif
