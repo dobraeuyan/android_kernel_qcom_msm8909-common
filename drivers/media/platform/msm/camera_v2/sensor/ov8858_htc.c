@@ -14,6 +14,7 @@
  */
 
 #include "msm_sensor.h"
+#include <linux/string.h>
 
 #define OV8858_HTC_SENSOR_NAME "ov8858_htc"
 
@@ -172,15 +173,17 @@ static int ov8858_htc_sysfs_init(void)
 #define OV8858_LITEON_OTP_SIZE 0x14
 
 /*
+ * OTP latched once at match_id (sensor powered) and handed back to the HTC
+ * daemon through the private CFG_I2C_IOCTL_R_OTP opcode, which the
+ * legacy-htc sensor ioctl translator routes to
+ * sensor_i2c_read_fuseid().
+ */
+static uint8_t ov8858_htc_otp[OV8858_LITEON_OTP_SIZE];
+static bool ov8858_htc_otp_valid;
+
+/*
  * Read the LiteOn OTP block (module vendor / lens / sensor version / driver IC
  * / actuator ID, fuse id and the AF infinity+macro calibration codes).
- *
- * The 3.10 driver also handed this back to userspace through
- * CFG_I2C_IOCTL_R_OTP -> sensorb_cfg_data.cfg.fuse / .af_value.  Those UAPI
- * members do not exist in this tree and adding them would change the layout of
- * a union shared with x104f/bamboo/x103f, so the values are only latched and
- * logged here.  If the HTC HAL turns out to need them, the way to do it
- * without an ABI break is a device-private cfgtype carrying its own struct.
  */
 static int ov8858_htc_read_otp(struct msm_sensor_ctrl_t *s_ctrl)
 {
@@ -198,8 +201,7 @@ static int ov8858_htc_read_otp(struct msm_sensor_ctrl_t *s_ctrl)
 		 0x7065, 0x7066, 0x7067, 0x7068, 0x7069, 0x706A, 0x706F,
 		 0x7070, 0x7071, 0x7072, 0x7082, 0x7083, 0x7084},
 	};
-	static uint8_t otp[OV8858_LITEON_OTP_SIZE];
-	static int32_t valid_layer = -1;
+	int32_t valid_layer = -1;
 	struct msm_camera_i2c_client *cli = s_ctrl->sensor_i2c_client;
 	const uint16_t addr_start = 0x7000;
 	const uint16_t addr_end = 0x73ff;
@@ -249,7 +251,7 @@ static int ov8858_htc_read_otp(struct msm_sensor_ctrl_t *s_ctrl)
 					addr[j][i]);
 				return rc;
 			}
-			otp[i] = read_data;
+			ov8858_htc_otp[i] = read_data;
 			if (read_data)
 				valid_layer = j;
 		}
@@ -258,7 +260,8 @@ static int ov8858_htc_read_otp(struct msm_sensor_ctrl_t *s_ctrl)
 	}
 	pr_info("%s: OTP valid layer = %d\n", __func__, valid_layer);
 
-	ov8858_htc_driver_ic = otp[3];
+	ov8858_htc_driver_ic = ov8858_htc_otp[3];
+	ov8858_htc_otp_valid = true;
 
 	rc = cli->i2c_func_tbl->i2c_write(cli, 0x0100, 0x00,
 		MSM_CAMERA_I2C_BYTE_DATA);
@@ -270,19 +273,56 @@ static int ov8858_htc_read_otp(struct msm_sensor_ctrl_t *s_ctrl)
 	if (rc < 0)
 		pr_info("%s: i2c_write b 0x5002 fail\n", __func__);
 
-	pr_info("%s: OTP Module vendor = 0x%x\n", __func__, otp[0]);
-	pr_info("%s: OTP LENS = 0x%x\n", __func__, otp[1]);
-	pr_info("%s: OTP Sensor Version = 0x%x\n", __func__, otp[2]);
+	pr_info("%s: OTP Module vendor = 0x%x\n", __func__,
+		ov8858_htc_otp[0]);
+	pr_info("%s: OTP LENS = 0x%x\n", __func__, ov8858_htc_otp[1]);
+	pr_info("%s: OTP Sensor Version = 0x%x\n", __func__,
+		ov8858_htc_otp[2]);
 	pr_info("%s: OTP Driver IC Vendor & Version = 0x%x\n", __func__,
-		otp[3]);
+		ov8858_htc_otp[3]);
 	pr_info("%s: OTP Actuator vendor ID & Version = 0x%x\n", __func__,
-		otp[4]);
+		ov8858_htc_otp[4]);
 	pr_info("%s: fuse id: 0x%x 0x%x 0x%x 0x%x\n", __func__,
-		otp[5], otp[6], otp[7], otp[8]);
+		ov8858_htc_otp[5], ov8858_htc_otp[6], ov8858_htc_otp[7],
+		ov8858_htc_otp[8]);
 	pr_info("%s: OTP AF inf 0x%x%02x macro 0x%x%02x\n", __func__,
-		otp[0xD], otp[0xE], otp[0xF], otp[0x10]);
+		ov8858_htc_otp[0xD], ov8858_htc_otp[0xE],
+		ov8858_htc_otp[0xF], ov8858_htc_otp[0x10]);
 
 	return rc;
+}
+
+static int ov8858_htc_read_fuseid(void *argp,
+	struct msm_sensor_ctrl_t *s_ctrl)
+{
+	struct sensorb_cfg_data_legacy_htc *hcdata = argp;
+	struct htc_af_value af;
+	struct htc_fuse_id fuse;
+
+	if (!ov8858_htc_otp_valid) {
+		ov8858_htc_read_otp(s_ctrl);
+		if (!ov8858_htc_otp_valid)
+			return -EIO;
+	}
+
+	fuse.word1 = ov8858_htc_otp[5];
+	fuse.word2 = ov8858_htc_otp[6];
+	fuse.word3 = ov8858_htc_otp[7];
+	fuse.word4 = ov8858_htc_otp[8];
+
+	memset(&af, 0, sizeof(af));
+	strlcpy(af.ACT_NAME, "ti201_act", sizeof(af.ACT_NAME));
+	af.VCM_VENDOR = ov8858_htc_otp[0];
+	af.VCM_VENDOR_ID_VERSION = ov8858_htc_otp[4];
+	af.AF_INF_MSB = ov8858_htc_otp[0xD];
+	af.AF_INF_LSB = ov8858_htc_otp[0xE];
+	af.AF_MACRO_MSB = ov8858_htc_otp[0xF];
+	af.AF_MACRO_LSB = ov8858_htc_otp[0x10];
+	af.MODULE_ID_AB = fuse.word2;
+
+	memcpy(&hcdata->af_value, &af, sizeof(af));
+	memcpy(hcdata->sensor_name, &fuse, sizeof(fuse));
+	return 0;
 }
 
 static int32_t ov8858_htc_sensor_match_id(struct msm_sensor_ctrl_t *s_ctrl)
@@ -308,6 +348,7 @@ static struct msm_sensor_fn_t ov8858_htc_sensor_func_tbl = {
 	.sensor_power_up = msm_sensor_power_up,
 	.sensor_power_down = msm_sensor_power_down,
 	.sensor_match_id = ov8858_htc_sensor_match_id,
+	.sensor_i2c_read_fuseid = ov8858_htc_read_fuseid,
 };
 
 static struct msm_sensor_ctrl_t ov8858_htc_s_ctrl = {

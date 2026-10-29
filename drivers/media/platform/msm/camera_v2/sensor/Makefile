@@ -11,3 +11,4 @@ obj-$(CONFIG_MSM_CAMERA_SENSOR) += msm_sensor_init.o msm_sensor_driver.o msm_sen
 obj-$(CONFIG_OV8858_HTC) += ov8858_htc.o
 obj-$(CONFIG_OV2680_HTC) += ov2680_htc.o
 obj-$(CONFIG_S5K5E_HTC) += s5k5e_htc.o
+obj-$(CONFIG_HTC_AWB_CAL) += htc_awb_cal.o

@@ -61,6 +61,9 @@ struct msm_sensor_fn_t {
 	int (*sensor_power_down)(struct msm_sensor_ctrl_t *);
 	int (*sensor_power_up)(struct msm_sensor_ctrl_t *);
 	int (*sensor_match_id)(struct msm_sensor_ctrl_t *);
+	/* Legacy-HTC CFG_I2C_IOCTL_R_OTP: fills af_value/fuse for the daemon. */
+	int (*sensor_i2c_read_fuseid)(void *argp,
+		struct msm_sensor_ctrl_t *);
 };
 
 struct msm_sensor_ctrl_t {

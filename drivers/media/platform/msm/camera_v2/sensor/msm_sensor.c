@@ -574,8 +574,24 @@ static long msm_sensor_config_legacy_htc(struct msm_sensor_ctrl_t *s_ctrl,
 	int i;
 
 	BUILD_BUG_ON(sizeof(struct sensorb_cfg_data_legacy_htc) != 200);
+	BUILD_BUG_ON(sizeof(struct htc_af_value) != 52);
+	BUILD_BUG_ON(offsetof(struct sensorb_cfg_data_legacy_htc,
+		af_value) != 8);
 	BUILD_BUG_ON(offsetof(struct sensorb_cfg_data_legacy_htc,
 		sensor_name) != 60);
+
+	/*
+	 * HTC's 3.10 enum appends CFG_I2C_IOCTL_R_OTP after CFG_SET_STREAM_TYPE
+	 * (26), where our CAF enum has CFG_SET_I2C_SYNC_PARAM.  That branch
+	 * cannot work on msm8909 (no CCI) and would also parse the OTP response
+	 * union as sync params, so the opcode is served by the sensor driver.
+	 */
+	if (hcdata->cfgtype == HTC_CFG_I2C_IOCTL_R_OTP) {
+		if (!s_ctrl->func_tbl->sensor_i2c_read_fuseid)
+			return -EFAULT;
+		return s_ctrl->func_tbl->sensor_i2c_read_fuseid(hcdata,
+			s_ctrl);
+	}
 
 	memset(&cdata, 0, sizeof(cdata));
 	cdata.cfgtype = hcdata->cfgtype;

@@ -765,13 +765,48 @@ struct msm_camera_i2c_seq_reg_array_legacy_m {
 /* HTC's sensor_sub_module_t stops at OIS (11 entries), not our 14. */
 #define HTC_SUB_MODULE_MAX 11
 
+/* af_value_t as HTC defines it: ACT_NAME[32] + 16 uint8_t + uint32_t. */
+struct htc_af_value {
+	char     ACT_NAME[32];
+	uint8_t  VCM_START_MSB;
+	uint8_t  VCM_START_LSB;
+	uint8_t  AF_INF_MSB;
+	uint8_t  AF_INF_LSB;
+	uint8_t  AF_MACRO_MSB;
+	uint8_t  AF_MACRO_LSB;
+	uint8_t  VCM_BIAS;
+	uint8_t  VCM_OFFSET;
+	uint8_t  VCM_BOTTOM_MECH_MSB;
+	uint8_t  VCM_BOTTOM_MECH_LSB;
+	uint8_t  VCM_TOP_MECH_MSB;
+	uint8_t  VCM_TOP_MECH_LSB;
+	uint8_t  VCM_VENDOR_ID_VERSION;
+	uint8_t  VCM_VENDOR;
+	uint8_t  ACT_ID;
+	uint32_t MODULE_ID_AB;
+};
+
+struct htc_fuse_id {
+	uint32_t word1;
+	uint32_t word2;
+	uint32_t word3;
+	uint32_t word4;
+};
+
+/*
+ * HTC appends this to the 3.10 sensor cfgtype enum, right after
+ * CFG_SET_STREAM_TYPE.  Our CAF enum reused the same slot for
+ * CFG_SET_I2C_SYNC_PARAM, so the legacy-htc translator intercepts the raw
+ * value before it reaches the generic sensor_config switch.
+ */
+#define HTC_CFG_I2C_IOCTL_R_OTP 26
+
 struct sensorb_cfg_data_legacy_htc {
 	int32_t  cfgtype;
 	int8_t   sensor_ver;
 	int8_t   lens_id;
 	uint8_t  _pad0[2];
-	/* af_value_t as HTC defines it: ACT_NAME[32] + 16 uint8_t + uint32_t */
-	uint8_t  af_value[52];
+	struct htc_af_value af_value;
 
 	/* --- union cfg, at +60 --- */
 	char     sensor_name[32];          /* MAX_SENSOR_NAME */

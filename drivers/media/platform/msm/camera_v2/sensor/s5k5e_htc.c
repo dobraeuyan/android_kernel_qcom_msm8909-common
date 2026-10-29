@@ -13,6 +13,7 @@
  */
 
 #include "msm_sensor.h"
+#include <linux/string.h>
 
 #define S5K5E_HTC_SENSOR_NAME "s5k5e_htc"
 
@@ -168,18 +169,21 @@ static int s5k5e_htc_sysfs_init(void)
 }
 
 /*
- * OTP read.  As in ov8858_htc.c the CFG_I2C_IOCTL_R_OTP hand-off to userspace
- * is dropped (the sensorb_cfg_data.cfg.fuse / .lens_id members it needs are
- * HTC-private UAPI that does not exist in this tree, and adding them would
- * change a union shared by the other msm8909 devices).  Values are logged.
+ * OTP read.  Latched once at match_id (sensor powered) and handed back to
+ * the HTC daemon through the private CFG_I2C_IOCTL_R_OTP opcode, which the
+ * legacy-htc sensor ioctl translator routes to
+ * sensor_i2c_read_fuseid().  The front module is fixed-focus, so only the
+ * fuse id and lens id are published.
  */
+static uint16_t s5k5e_htc_id_data[6];
+static bool s5k5e_htc_otp_valid;
+
 static int s5k5e_htc_read_otp(struct msm_sensor_ctrl_t *s_ctrl)
 {
 	static const uint16_t id_addr[6] = {
 		0x0A04, 0x0A05, 0x0A06, 0x0A07, 0x0A08, 0x0A09
 	};
-	static uint16_t id_data[6];
-	static int32_t valid_page = -1;
+	int32_t valid_page = -1;
 	struct msm_camera_i2c_client *cli = s_ctrl->sensor_i2c_client;
 	uint16_t read_data = 0;
 	int32_t rc = 0;
@@ -205,13 +209,14 @@ static int s5k5e_htc_read_otp(struct msm_sensor_ctrl_t *s_ctrl)
 			if (rc < 0)
 				pr_err("%s: i2c_read 0x%x failed\n", __func__,
 					id_addr[i]);
-			id_data[i] = read_data & 0xff;
+			s5k5e_htc_id_data[i] = read_data & 0xff;
 		}
 		if (read_data)
 			valid_page = j;
 		if (valid_page != -1)
 			break;
 	}
+	s5k5e_htc_otp_valid = true;
 
 	rc = cli->i2c_func_tbl->i2c_write(cli, 0x0A00, 0x04,
 		MSM_CAMERA_I2C_BYTE_DATA);
@@ -223,13 +228,39 @@ static int s5k5e_htc_read_otp(struct msm_sensor_ctrl_t *s_ctrl)
 		pr_err("%s: i2c_write failed\n", __func__);
 
 	pr_info("%s: OTP valid page = %d\n", __func__, valid_page);
-	pr_info("%s: OTP Module vendor = 0x%x\n", __func__, id_data[0]);
-	pr_info("%s: OTP LENS = 0x%x\n", __func__, id_data[1]);
-	pr_info("%s: OTP Sensor Version = 0x%x\n", __func__, id_data[2]);
+	pr_info("%s: OTP Module vendor = 0x%x\n", __func__,
+		s5k5e_htc_id_data[0]);
+	pr_info("%s: OTP LENS = 0x%x\n", __func__, s5k5e_htc_id_data[1]);
+	pr_info("%s: OTP Sensor Version = 0x%x\n", __func__,
+		s5k5e_htc_id_data[2]);
 	pr_info("%s: fuse id: 0x0 0x%x 0x%x 0x%x\n", __func__,
-		id_data[3], id_data[4], id_data[5]);
+		s5k5e_htc_id_data[3], s5k5e_htc_id_data[4],
+		s5k5e_htc_id_data[5]);
 
 	return rc;
+}
+
+static int s5k5e_htc_read_fuseid(void *argp,
+	struct msm_sensor_ctrl_t *s_ctrl)
+{
+	struct sensorb_cfg_data_legacy_htc *hcdata = argp;
+	struct htc_fuse_id fuse;
+
+	if (!s5k5e_htc_otp_valid) {
+		s5k5e_htc_read_otp(s_ctrl);
+		if (!s5k5e_htc_otp_valid)
+			return -EIO;
+	}
+
+	fuse.word1 = 0;
+	fuse.word2 = s5k5e_htc_id_data[3];
+	fuse.word3 = s5k5e_htc_id_data[4];
+	fuse.word4 = s5k5e_htc_id_data[5];
+
+	memset(&hcdata->af_value, 0, sizeof(hcdata->af_value));
+	memcpy(hcdata->sensor_name, &fuse, sizeof(fuse));
+	hcdata->lens_id = s5k5e_htc_id_data[1];
+	return 0;
 }
 
 static int32_t s5k5e_htc_sensor_match_id(struct msm_sensor_ctrl_t *s_ctrl)
@@ -255,6 +286,7 @@ static struct msm_sensor_fn_t s5k5e_htc_sensor_func_tbl = {
 	.sensor_power_up = msm_sensor_power_up,
 	.sensor_power_down = msm_sensor_power_down,
 	.sensor_match_id = s5k5e_htc_sensor_match_id,
+	.sensor_i2c_read_fuseid = s5k5e_htc_read_fuseid,
 };
 
 static struct msm_sensor_ctrl_t s5k5e_htc_s_ctrl = {
