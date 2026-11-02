@@ -419,3 +419,11 @@
 		ti,supply-name = "coulometer";
 	};
 };
+
+&thermal_zones {
+	/delete-node/ pa-therm0-adc;
+};
+
+&pm8916_vadc {
+	/delete-node/ chan@36;
+};

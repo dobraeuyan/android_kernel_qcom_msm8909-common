@@ -517,6 +517,8 @@
 };
 
 &pm8916_vadc {
+	/delete-node/ chan@36;
+
 	chan@76 {
 		label = "usbid";
 		reg = <0x76>;
@@ -582,7 +584,7 @@
 		gsl,name = "gsl_ctp";
 		reg = <0x40>;
 		interrupt-parent = <&msm_gpio>;
-		interrupts = <13 0x2001>;
+		interrupts = <13 0x2008>;
 		vdd-supply = <&pm8916_l17>;
 		vcc_i2c-supply = <&pm8916_l6>;
 		pinctrl-names = "pmx_ts_active", "pmx_ts_suspend";
@@ -593,7 +595,7 @@
 		gsl,hard-reset-delay-ms = <5>;
 		gsl,post-hard-reset-delay-ms = <5>;
 		gsl,reset-gpio = <&msm_gpio 12 0x00>;
-		gsl,irq-gpio = <&msm_gpio 13 0x2001>;
+		gsl,irq-gpio = <&msm_gpio 13 0x2008>;
 		gsl,num-max-touches = <10>;
 		gsl,panel_tx_num = <24>;
 		gsl,panel_rx_num = <14>;
@@ -950,4 +952,8 @@
 
 &blsp1_uart2_hs {
 	status = "disabled";
+};
+
+&thermal_zones {
+	/delete-node/ pa-therm0-adc;
 };
