@@ -557,3 +557,11 @@
 		reg-names = "smem-start-addr";
 	};
 };
+
+&msm_gpu {
+	qcom,gpu-pwrlevels {
+		qcom,gpu-pwrlevel@0 {
+			qcom,gpu-freq = <409600000>;
+		};
+	};
+};
