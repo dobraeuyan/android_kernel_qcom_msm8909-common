@@ -1667,15 +1667,7 @@ void hdd_suspend_wlan(void)
        if (FALSE == hdd_enter_bmps && (BMPS == pmcGetPmcState(pHddCtx->hHal)))
        {
             hdd_enter_bmps = TRUE;
-
-           /* If device was already in BMPS, and dynamic DTIM is set,
-            * exit(set the device to full power) and enter BMPS again
-            * to reflect new DTIM value */
-           wlan_hdd_enter_bmps(pAdapter, DRIVER_POWER_MODE_ACTIVE);
-
-           wlan_hdd_enter_bmps(pAdapter, DRIVER_POWER_MODE_AUTO);
-
-           pHddCtx->hdd_ignore_dtim_enabled = TRUE;
+            pHddCtx->hdd_ignore_dtim_enabled = TRUE;
        }
 #ifdef SUPPORT_EARLY_SUSPEND_STANDBY_DEEPSLEEP
        if (pHddCtx->cfg_ini->nEnableSuspend == WLAN_MAP_SUSPEND_TO_STANDBY)

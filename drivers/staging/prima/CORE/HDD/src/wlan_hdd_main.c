@@ -13442,46 +13442,66 @@ static int hdd_generate_iface_mac_addr_auto(hdd_context_t *pHddCtx,
    unsigned int serialno;
    serialno = wcnss_get_serial_number();
 
-   if (0 != serialno)
+   if (0 == idx)
    {
-      /* MAC address has 3 bytes of OUI so we have a maximum of 3
-         bytes of the serial number that can be used to generate
-         the other 3 bytes of the MAC address.  Mask off all but
-         the lower 3 bytes (this will also make sure we don't
-         overflow in the next step) */
-      serialno &= 0x00FFFFFF;
-
-      /* we need a unique address for each session */
-      serialno *= VOS_MAX_CONCURRENCY_PERSONA;
-
-      /* autogen other Mac addresses */
-      for (i = idx; i < VOS_MAX_CONCURRENCY_PERSONA; i++)
+      if (0 != serialno)
       {
-         /* start with the entire default address */
-         pHddCtx->cfg_ini->intfMacAddr[i] = mac_addr;
-         /* then replace the lower 3 bytes */
-         pHddCtx->cfg_ini->intfMacAddr[i].bytes[3] = (serialno >> 16) & 0xFF;
-         pHddCtx->cfg_ini->intfMacAddr[i].bytes[4] = (serialno >> 8) & 0xFF;
-         pHddCtx->cfg_ini->intfMacAddr[i].bytes[5] = serialno & 0xFF;
+         for (i = 0; i < VOS_MAX_CONCURRENCY_PERSONA; i++)
+         {
+            pHddCtx->cfg_ini->intfMacAddr[i].bytes[0] = 0x02;
+            pHddCtx->cfg_ini->intfMacAddr[i].bytes[1] = (serialno >> 24) & 0xFF;
+            pHddCtx->cfg_ini->intfMacAddr[i].bytes[2] = (serialno >> 16) & 0xFF;
+            pHddCtx->cfg_ini->intfMacAddr[i].bytes[3] = (serialno >> 8) & 0xFF;
+            pHddCtx->cfg_ini->intfMacAddr[i].bytes[4] = serialno & 0xFF;
+            pHddCtx->cfg_ini->intfMacAddr[i].bytes[5] = (v_U8_t)i;
 
-		if (0 == memcmp(&pHddCtx->cfg_ini->intfMacAddr[i].bytes[0],
-				&mac_addr.bytes[0], VOS_MAC_ADDR_SIZE))
-			pHddCtx->cfg_ini->intfMacAddr[i].bytes[5] +=
-				VOS_MAX_CONCURRENCY_PERSONA;
-
-         serialno++;
-         hddLog(VOS_TRACE_LEVEL_ERROR,
-                   "%s: Derived Mac Addr: "
+            hddLog(VOS_TRACE_LEVEL_ERROR,
+                   "%s: Derived IEEE LAA Mac Addr: "
                    MAC_ADDRESS_STR, __func__,
                    MAC_ADDR_ARRAY(pHddCtx->cfg_ini->intfMacAddr[i].bytes));
+         }
       }
+      else
+      {
+         eth_random_addr(pHddCtx->cfg_ini->intfMacAddr[0].bytes);
+         hddLog(VOS_TRACE_LEVEL_ERROR,
+                "%s: Serial NO is 0; generated random LAA Mac Addr: "
+                MAC_ADDRESS_STR, __func__,
+                MAC_ADDR_ARRAY(pHddCtx->cfg_ini->intfMacAddr[0].bytes));
 
+         for (i = 1; i < VOS_MAX_CONCURRENCY_PERSONA; i++)
+         {
+            pHddCtx->cfg_ini->intfMacAddr[i] = pHddCtx->cfg_ini->intfMacAddr[0];
+            pHddCtx->cfg_ini->intfMacAddr[i].bytes[5] ^= (v_U8_t)i;
+            hddLog(VOS_TRACE_LEVEL_ERROR,
+                   "%s: Derived random secondary Mac Addr: "
+                   MAC_ADDRESS_STR, __func__,
+                   MAC_ADDR_ARRAY(pHddCtx->cfg_ini->intfMacAddr[i].bytes));
+         }
+      }
    }
    else
    {
-      hddLog(LOGE, FL("Failed to Get Serial NO"));
-      return -1;
+      for (i = idx; i < VOS_MAX_CONCURRENCY_PERSONA; i++)
+      {
+         pHddCtx->cfg_ini->intfMacAddr[i] = mac_addr;
+         pHddCtx->cfg_ini->intfMacAddr[i].bytes[0] |= 0x02;
+         pHddCtx->cfg_ini->intfMacAddr[i].bytes[5] ^= (v_U8_t)i;
+
+         if (0 == memcmp(&pHddCtx->cfg_ini->intfMacAddr[i].bytes[0],
+                         &mac_addr.bytes[0], VOS_MAC_ADDR_SIZE))
+         {
+            pHddCtx->cfg_ini->intfMacAddr[i].bytes[5] =
+               (pHddCtx->cfg_ini->intfMacAddr[i].bytes[5] + 1) & 0xFF;
+         }
+
+         hddLog(VOS_TRACE_LEVEL_ERROR,
+                "%s: Derived secondary Mac Addr: "
+                MAC_ADDRESS_STR, __func__,
+                MAC_ADDR_ARRAY(pHddCtx->cfg_ini->intfMacAddr[i].bytes));
+      }
    }
+
    return 0;
 }
 

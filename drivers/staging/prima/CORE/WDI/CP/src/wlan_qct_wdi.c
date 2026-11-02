@@ -18489,10 +18489,21 @@ WDI_ProcessSetBssKeyRsp
 
   if ( eHAL_STATUS_SUCCESS != halStatus )
   {
-     WPAL_TRACE( eWLAN_MODULE_DAL_CTRL,  eWLAN_PAL_TRACE_LEVEL_ERROR,
-              "Set BSS Key failed with status %s (%d)",
-              WDI_getHALStatusMsgString(halStatus),
-              halStatus);
+     if ( eHAL_STATUS_STA_TABLE_FULL == halStatus )
+     {
+        WPAL_TRACE( eWLAN_MODULE_DAL_CTRL, eWLAN_PAL_TRACE_LEVEL_WARN,
+                 "%s: Set BSS Key returned eHAL_STATUS_STA_TABLE_FULL (%d); "
+                 "treating as non-fatal to preserve association",
+                 __func__, halStatus);
+        wdiStatus = WDI_STATUS_SUCCESS;
+     }
+     else
+     {
+        WPAL_TRACE( eWLAN_MODULE_DAL_CTRL,  eWLAN_PAL_TRACE_LEVEL_ERROR,
+                 "Set BSS Key failed with status %s (%d)",
+                 WDI_getHALStatusMsgString(halStatus),
+                 halStatus);
+     }
      /* send the status to UMAC, don't return from here*/
   }
 
@@ -18604,10 +18615,21 @@ WDI_ProcessSetStaKeyRsp
 
   if ( eHAL_STATUS_SUCCESS != halStatus )
   {
-     WPAL_TRACE( eWLAN_MODULE_DAL_CTRL,  eWLAN_PAL_TRACE_LEVEL_ERROR,
-              "Set STA Key failed with status %s (%d)",
-              WDI_getHALStatusMsgString(halStatus),
-              halStatus);
+     if ( eHAL_STATUS_STA_TABLE_FULL == halStatus )
+     {
+        WPAL_TRACE( eWLAN_MODULE_DAL_CTRL, eWLAN_PAL_TRACE_LEVEL_WARN,
+                 "%s: Set STA Key returned eHAL_STATUS_STA_TABLE_FULL (%d); "
+                 "treating as non-fatal to preserve association",
+                 __func__, halStatus);
+        wdiStatus = WDI_STATUS_SUCCESS;
+     }
+     else
+     {
+        WPAL_TRACE( eWLAN_MODULE_DAL_CTRL,  eWLAN_PAL_TRACE_LEVEL_ERROR,
+                 "Set STA Key failed with status %s (%d)",
+                 WDI_getHALStatusMsgString(halStatus),
+                 halStatus);
+     }
      /* send the status to UMAC, don't return from here*/
   }
 
@@ -18721,10 +18743,21 @@ WDI_ProcessSetStaBcastKeyRsp
 
   if ( eHAL_STATUS_SUCCESS != halStatus )
   {
-     WPAL_TRACE( eWLAN_MODULE_DAL_CTRL,  eWLAN_PAL_TRACE_LEVEL_ERROR,
-              "Set STA Key failed with status %s (%d)",
-              WDI_getHALStatusMsgString(halStatus),
-              halStatus);
+     if ( eHAL_STATUS_STA_TABLE_FULL == halStatus )
+     {
+        WPAL_TRACE( eWLAN_MODULE_DAL_CTRL, eWLAN_PAL_TRACE_LEVEL_WARN,
+                 "%s: Set STA Bcast Key returned eHAL_STATUS_STA_TABLE_FULL (%d); "
+                 "treating as non-fatal to preserve association",
+                 __func__, halStatus);
+        wdiStatus = WDI_STATUS_SUCCESS;
+     }
+     else
+     {
+        WPAL_TRACE( eWLAN_MODULE_DAL_CTRL,  eWLAN_PAL_TRACE_LEVEL_ERROR,
+                 "Set STA Key failed with status %s (%d)",
+                 WDI_getHALStatusMsgString(halStatus),
+                 halStatus);
+     }
      /* send the status to UMAC, don't return from here*/
   }
 
