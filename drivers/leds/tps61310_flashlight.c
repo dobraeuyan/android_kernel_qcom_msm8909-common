@@ -1514,7 +1514,9 @@ static int tps61310_torch_set(struct tps61310_led_data *led,
 		FLT_INFO_LOG("dualtorch 1.5A - simple\n");
 		switch (led->id) {
 		case LED_2:
-			current_hex = (value / 25) & 0x07;
+			current_hex = value / 25;
+			if (current_hex > 0x07)
+				current_hex = 0x07;
 			tps61310_i2c_command(0x05, 0x6A);
 			tps61310_i2c_command(0x00, current_hex);
 			break;

@@ -863,6 +863,111 @@ static int32_t msm_flash_query_data(struct msm_flash_ctrl_t *flash_ctrl,
 	return rc;
 }
 
+static int32_t msm_flash_led_data_cfg(struct msm_flash_ctrl_t *flash_ctrl,
+	void *argp)
+{
+	struct msm_camera_led_cfg_t *led_cfg =
+		(struct msm_camera_led_cfg_t *)argp;
+	struct msm_flash_cfg_data_t flash_data;
+	uint32_t i = 0;
+	int32_t rc = 0;
+
+	if (!led_cfg)
+		return -EINVAL;
+
+	memset(&flash_data, 0, sizeof(flash_data));
+
+	mutex_lock(flash_ctrl->flash_mutex);
+
+	if (!flash_ctrl->func_tbl) {
+		for (i = 0; i < ARRAY_SIZE(flash_table); i++) {
+			if (flash_ctrl->flash_driver_type ==
+				flash_table[i]->flash_driver_type) {
+				flash_ctrl->func_tbl =
+					&flash_table[i]->func_tbl;
+				break;
+			}
+		}
+	}
+
+	if (!flash_ctrl->func_tbl) {
+		rc = -EINVAL;
+		goto exit;
+	}
+
+	switch (led_cfg->cfgtype) {
+	case MSM_CAMERA_LED_INIT:
+		for (i = 0; i < MAX_LED_TRIGGERS; i++) {
+			led_cfg->torch_current[i] =
+				flash_ctrl->torch_max_current[i];
+			led_cfg->flash_current[i] =
+				flash_ctrl->flash_max_current[i];
+			led_cfg->flash_duration[i] =
+				flash_ctrl->flash_max_duration[i];
+			flash_data.flash_current[i] =
+				led_cfg->flash_current[i];
+			flash_data.flash_duration[i] =
+				led_cfg->flash_duration[i];
+		}
+		if (flash_ctrl->func_tbl->camera_flash_init)
+			rc = flash_ctrl->func_tbl->camera_flash_init(
+				flash_ctrl, &flash_data);
+		if (!rc)
+			flash_ctrl->flash_state = MSM_CAMERA_FLASH_INIT;
+		break;
+	case MSM_CAMERA_LED_OFF:
+		rc = flash_ctrl->func_tbl->camera_flash_off(flash_ctrl,
+			&flash_data);
+		if (!rc)
+			flash_ctrl->flash_state = MSM_CAMERA_FLASH_OFF;
+		break;
+	case MSM_CAMERA_LED_LOW:
+		for (i = 0; i < MAX_LED_TRIGGERS; i++) {
+			flash_data.flash_current[i] =
+				led_cfg->torch_current[i];
+			if (flash_data.flash_current[i] <= 0)
+				flash_data.flash_current[i] =
+					flash_ctrl->torch_op_current[i];
+			if (flash_data.flash_current[i] <= 0)
+				flash_data.flash_current[i] =
+					flash_ctrl->torch_max_current[i];
+		}
+		rc = flash_ctrl->func_tbl->camera_flash_low(flash_ctrl,
+			&flash_data);
+		if (!rc)
+			flash_ctrl->flash_state = MSM_CAMERA_FLASH_LOW;
+		break;
+	case MSM_CAMERA_LED_HIGH:
+		for (i = 0; i < MAX_LED_TRIGGERS; i++) {
+			flash_data.flash_current[i] =
+				led_cfg->flash_current[i];
+			if (flash_data.flash_current[i] <= 0)
+				flash_data.flash_current[i] =
+					flash_ctrl->flash_op_current[i];
+			if (flash_data.flash_current[i] <= 0)
+				flash_data.flash_current[i] =
+					flash_ctrl->flash_max_current[i];
+			flash_data.flash_duration[i] =
+				led_cfg->flash_duration[i];
+		}
+		rc = flash_ctrl->func_tbl->camera_flash_high(flash_ctrl,
+			&flash_data);
+		if (!rc)
+			flash_ctrl->flash_state = MSM_CAMERA_FLASH_HIGH;
+		break;
+	case MSM_CAMERA_LED_RELEASE:
+		rc = flash_ctrl->func_tbl->camera_flash_release(flash_ctrl);
+		break;
+	default:
+		rc = -EFAULT;
+		break;
+	}
+
+exit:
+	mutex_unlock(flash_ctrl->flash_mutex);
+	return rc;
+}
+
 static long msm_flash_subdev_ioctl(struct v4l2_subdev *sd,
 	unsigned int cmd, void *arg)
 {
@@ -885,6 +990,9 @@ static long msm_flash_subdev_ioctl(struct v4l2_subdev *sd,
 		return msm_flash_get_subdev_id(fctrl, argp);
 	case VIDIOC_MSM_FLASH_CFG:
 		return msm_flash_config(fctrl, argp);
+	case VIDIOC_MSM_FLASH_LED_DATA_CFG:
+	case VIDIOC_MSM_FLASH_LED_DATA_CFG_LEGACY_HTC:
+		return msm_flash_led_data_cfg(fctrl, argp);
 	case MSM_SD_NOTIFY_FREEZE:
 		return 0;
 	case MSM_SD_UNNOTIFY_FREEZE:
@@ -1322,7 +1430,7 @@ static int32_t msm_flash_platform_probe(struct platform_device *pdev)
 		ARRAY_SIZE(flash_ctrl->msm_sd.sd.name),
 		"msm_camera_flash");
 	media_entity_pads_init(&flash_ctrl->msm_sd.sd.entity, 0, NULL);
-	flash_ctrl->msm_sd.sd.entity.function = MSM_CAMERA_SUBDEV_FLASH;
+	flash_ctrl->msm_sd.sd.entity.function = MSM_CAMERA_SUBDEV_LED_FLASH;
 	flash_ctrl->msm_sd.close_seq = MSM_SD_CLOSE_2ND_CATEGORY | 0x1;
 	msm_sd_register(&flash_ctrl->msm_sd);
 

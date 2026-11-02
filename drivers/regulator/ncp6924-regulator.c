@@ -499,7 +499,8 @@ static int ncp6924_probe(struct i2c_client *client, const struct i2c_device_id *
 			goto fail_free_vreg;
 		}
 
-		if (of_property_read_bool(child, "ldo-always-on"))
+		if (of_property_read_bool(child, "ldo-always-on") ||
+		    of_property_read_bool(child, "regulator-always-on"))
 			ncp6924_vreg->always_on = true;
 		else
 			ncp6924_vreg->always_on = false;
@@ -517,6 +518,9 @@ static int ncp6924_probe(struct i2c_client *client, const struct i2c_device_id *
 			ret = -ENOMEM;
 			goto fail_free_vreg;
 		}
+
+		if (init_data->constraints.always_on)
+			ncp6924_vreg->always_on = true;
 
 		if (init_data->constraints.name == NULL) {
 			dev_err(dev, "%s: regulator name not specified\n", __func__);
@@ -610,11 +614,17 @@ static int __maybe_unused ncp6924_resume(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct ncp6924_regulator *reg;
+	int idx = 0;
 
 	pr_info("%s\n", __func__);
 	reg = i2c_get_clientdata(client);
 	if (ncp6924_is_enable(reg) == false)
 		ncp6924_enable(reg, true);
+
+	for (idx = 0; idx < reg->total_vregs; idx++) {
+		if (reg->ncp6924_vregs[idx].always_on && reg->ncp6924_vregs[idx].rdev)
+			ncp6924_vreg_enable(reg->ncp6924_vregs[idx].rdev);
+	}
 
 	return 0;
 }

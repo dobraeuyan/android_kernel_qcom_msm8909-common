@@ -555,6 +555,14 @@ struct msm_camera_led_cfg_t {
 	int32_t flash_duration[MAX_LED_TRIGGERS];
 };
 
+struct msm_camera_led_cfg_legacy_htc_t {
+	enum msm_camera_led_config_t cfgtype;
+	int32_t torch_current[MAX_LED_TRIGGERS];
+	int32_t flash_current[MAX_LED_TRIGGERS];
+	int32_t flash_duration[MAX_LED_TRIGGERS];
+	uint32_t ma_value;
+};
+
 struct msm_flash_init_info_t {
 	enum msm_flash_driver_type flash_driver_type;
 	uint32_t slave_addr;
@@ -712,6 +720,9 @@ struct msm_camera_i2c_seq_reg_array_legacy_m {
 
 #define VIDIOC_MSM_FLASH_LED_DATA_CFG \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 7, struct msm_camera_led_cfg_t)
+
+#define VIDIOC_MSM_FLASH_LED_DATA_CFG_LEGACY_HTC \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 7, struct msm_camera_led_cfg_legacy_htc_t)
 
 #define VIDIOC_MSM_EEPROM_CFG \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 8, struct msm_eeprom_cfg_data)

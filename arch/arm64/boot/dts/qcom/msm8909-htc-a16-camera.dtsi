@@ -124,6 +124,7 @@
 			regulator-max-microvolt = <3100000>;
 			regulator-boot-on;
 			regulator-always-on;
+			ldo-always-on;
 			ncp,resource-id = <2>;
 			ncp,regulator-type = <0>;
 			ncp,enable-addr = <0x14>;
@@ -213,7 +214,7 @@
 			htc,default-state = "off";
 			htc,max-current = <200>;
 			qcom,max-current = <200>;
-			qcom,current = <200>;
+			qcom,current = <125>;
 		};
 	};
 };
