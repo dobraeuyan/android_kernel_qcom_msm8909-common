@@ -868,7 +868,6 @@
 		qcom,is-pronto-vadc;
 		qcom,has-pronto-hw;
 
-		qcom,wcnss-pm = <11 21 1200 1 1 6>;
 		qcom,wcnss-adc_tm = <&pm8909_adc_tm>;
 	};
 
