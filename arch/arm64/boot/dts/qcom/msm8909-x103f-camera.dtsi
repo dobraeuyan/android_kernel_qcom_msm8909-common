@@ -153,7 +153,7 @@
 		reg = <0x2>;
 		qcom,csiphy-sd-index = <0>;
 		qcom,csid-sd-index = <0>;
-		qcom,mount-angle = <90>;
+		qcom,mount-angle = <0>;
 		qcom,actuator-src = <&actuator0>;
 		qcom,eeprom-src = <&eeprom0>;
 		cam_vio-supply = <&pm8916_l6>;
@@ -194,7 +194,7 @@
 		qcom,csiphy-sd-index = <0>;
 
 		qcom,csid-sd-index = <0>;
-		qcom,mount-angle = <270>;
+		qcom,mount-angle = <0>;
 		cam_vio-supply = <&pm8916_l6>;
 		qcom,cam-vreg-name = "cam_vio";
 		qcom,cam-vreg-type = <1>;
