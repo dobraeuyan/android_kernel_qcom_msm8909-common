@@ -282,12 +282,12 @@
 
 	hsuart_active: default {
 		mux {
-			pins = "gpio20", "gpio21", "gpio111", "gpio112";
+			pins = "gpio20", "gpio111", "gpio112";
 			function = "blsp_uart2";
 		};
 
 		config {
-			pins = "gpio20", "gpio21", "gpio111", "gpio112";
+			pins = "gpio20", "gpio111", "gpio112";
 			drive-strength = <16>;
 			bias-disable;
 		};
@@ -295,14 +295,27 @@
 
 	hsuart_sleep: sleep {
 		mux {
-			pins = "gpio20", "gpio21", "gpio111", "gpio112";
+			pins = "gpio20", "gpio111", "gpio112";
 			function = "blsp_uart2";
 		};
 
 		config {
-			pins = "gpio20", "gpio21", "gpio111", "gpio112";
+			pins = "gpio20", "gpio111", "gpio112";
 			drive-strength = <2>;
 			bias-disable;
+		};
+	};
+
+	usbid_as_int: usbid_as_int {
+		mux {
+			pins = "gpio21";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio21";
+			drive-strength = <2>;
+			bias-pull-up;
 		};
 	};
 
@@ -518,44 +531,16 @@
 
 &pm8916_vadc {
 	/delete-node/ chan@36;
-
-	chan@76 {
-		label = "usbid";
-		reg = <0x76>;
-		qcom,decimation = <0>;
-		qcom,pre-div-channel-scaling = <0>;
-		qcom,calibration-type = "absolute";
-		qcom,scale-function = <0>;
-		qcom,hw-settle-time = <0>;
-		qcom,fast-avg-setup = <0>;
-	};
-};
-
-&pm8916_adc_tm {
-	chan@76 {
-		label = "usbid";
-		reg = <0x76>;
-		qcom,decimation = <0>;
-		qcom,pre-div-channel-scaling = <0>;
-
-		qcom,calibration-type = "ratiometric";
-		qcom,scale-function = <2>;
-		qcom,hw-settle-time = <0>;
-		qcom,fast-avg-setup = <0>;
-		qcom,btm-channel-number = <0x88>;
-	};
 };
 
 &usb_otg {
-
 	interrupts = <0 134 0>, <0 140 0>;
 	interrupt-names = "core_irq", "async_irq";
 	qcom,hsusb-otg-mode = <3>;
 	vbus_otg-supply = <&smb358_otg_supply>;
-
-	qcom,usbid-vadc = <&pm8916_vadc>;
-	qcom,usbid-adc_tm = <&pm8916_adc_tm>;
-
+	qcom,usbid-gpio = <&msm_gpio 21 0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&usbid_as_int>;
 	extcon = <&smb358_otg_supply>;
 };
 
