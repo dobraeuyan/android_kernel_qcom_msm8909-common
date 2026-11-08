@@ -406,7 +406,8 @@ static int32_t msm_sensor_fill_slave_info_init_params(
 		sensor_info->position =
 			sensor_init_params->position;
 
-	if (sensor_init_params->sensor_mount_angle < SENSOR_MAX_MOUNTANGLE) {
+	if (!sensor_info->is_mount_angle_valid &&
+		sensor_init_params->sensor_mount_angle < SENSOR_MAX_MOUNTANGLE) {
 		sensor_info->sensor_mount_angle =
 			sensor_init_params->sensor_mount_angle;
 		sensor_info->is_mount_angle_valid = 1;
