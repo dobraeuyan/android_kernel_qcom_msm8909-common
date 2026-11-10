@@ -13662,30 +13662,21 @@ static eHalStatus csrRoamStartWds( tpAniSirGlobal pMac, tANI_U32 sessionId, tCsr
 }
 
 #ifdef WLAN_FEATURE_SAE
-/*
- * csr_update_sae_config: Copy SAE info to join request
- * @profile: pointer to profile
- * @csr_join_req: csr join request
- *
- * Return: None
- */
 static bool csr_update_sae_config(tSirMacAddr bssid, tpAniSirGlobal mac,
                                   tCsrRoamSession *session)
 {
     tPmkidCacheInfo pmkid_cache;
     uint32_t index;
-    bool sae_pmk_cached;
 
+    vos_mem_zero(&pmkid_cache, sizeof(pmkid_cache));
     vos_mem_copy(pmkid_cache.BSSID, bssid, VOS_MAC_ADDR_SIZE);
 
-    sae_pmk_cached =
-              csr_lookup_pmkid_using_bssid(mac, session, &pmkid_cache, &index);
+    if (csr_lookup_pmkid_using_bssid(mac, session, &pmkid_cache, &index))
+    {
+        csrRoamDelPMKIDfromCache(mac, session->sessionId, &pmkid_cache, FALSE);
+    }
 
-    VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_DEBUG,
-              "pmk_cached %d for BSSID=" MAC_ADDRESS_STR, sae_pmk_cached,
-              MAC_ADDR_ARRAY(bssid));
-
-    return sae_pmk_cached;
+    return false;
 }
 #else
 static bool csr_update_sae_config(tSirMacAddr bssid, tpAniSirGlobal mac,

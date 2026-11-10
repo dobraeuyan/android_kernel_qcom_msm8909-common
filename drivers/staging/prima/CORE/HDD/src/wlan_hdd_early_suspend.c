@@ -1023,25 +1023,138 @@ void __hdd_ipv4_notifier_work_queue(struct work_struct *work)
         return;
     }
 
-    if ((eConnectionState_Associated ==
-                (WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))->conn_info.connState)
-        && (pHddCtx->hdd_wlan_suspended))
+    if (eConnectionState_Associated ==
+            (WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))->conn_info.connState)
     {
-        // This invocation being part of the IPv4 registration callback,
-        // we are passing second parameter as 2 to avoid registration
-        // of IPv4 notifier again.
-        check_and_set_suspend_resume_mcbc_filter(pHddCtx);
-        if (pHddCtx->cfg_ini->fhostArpOffload)
+        if (pAdapter->device_mode == WLAN_HDD_INFRA_STATION)
         {
-            hdd_conf_arp_offload(pAdapter, 2);
+            hdd_conf_periodic_arp_keepalive(pAdapter, VOS_TRUE);
         }
-        else
+        if (pHddCtx->hdd_wlan_suspended)
         {
-            hddLog(VOS_TRACE_LEVEL_INFO,
-                    FL("offload: arp offload ini is disabled in host"));
+            check_and_set_suspend_resume_mcbc_filter(pHddCtx);
+            if (pHddCtx->cfg_ini->fhostArpOffload)
+            {
+                hdd_conf_arp_offload(pAdapter, 2);
+            }
+            else
+            {
+                hddLog(VOS_TRACE_LEVEL_INFO,
+                        FL("offload: arp offload ini is disabled in host"));
+            }
         }
     }
     EXIT();
+}
+
+VOS_STATUS hdd_conf_periodic_arp_keepalive(hdd_adapter_t *pAdapter,
+                                           v_BOOL_t fenable)
+{
+    hdd_context_t *pHddCtx;
+    hdd_station_ctx_t *pHddStaCtx;
+    struct in_device *in_dev;
+    struct in_ifaddr **ifap = NULL;
+    struct in_ifaddr *ifa = NULL;
+    struct sSirAddPeriodicTxPtrn *add_req;
+    struct sSirDelPeriodicTxPtrn *del_req;
+    uint8_t pattern_id = MAXNUM_PERIODIC_TX_PTRNS - 1;
+    uint8_t active = 0;
+
+    if (NULL == pAdapter)
+        return VOS_STATUS_E_FAILURE;
+
+    pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+    if (0 != wlan_hdd_validate_context(pHddCtx))
+        return VOS_STATUS_E_FAILURE;
+
+    pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
+    if (NULL == pHddStaCtx)
+        return VOS_STATUS_E_FAILURE;
+
+    mutex_lock(&pHddCtx->op_ctx.op_lock);
+    if (pHddCtx->op_ctx.op_table[pattern_id].request_id == 0xFFFFFFFFU)
+    {
+        pHddCtx->op_ctx.op_table[pattern_id].request_id = 0;
+        active = 1;
+    }
+    mutex_unlock(&pHddCtx->op_ctx.op_lock);
+
+    if (active)
+    {
+        del_req = vos_mem_malloc(sizeof(*del_req));
+        if (del_req)
+        {
+            vos_mem_zero(del_req, sizeof(*del_req));
+            vos_mem_copy(del_req->macAddress,
+                         pAdapter->macAddressCurrent.bytes,
+                         VOS_MAC_ADDR_SIZE);
+            del_req->ucPatternIdBitmap = (1 << pattern_id);
+            sme_DelPeriodicTxPtrn(pHddCtx->hHal, del_req);
+            vos_mem_free(del_req);
+        }
+    }
+
+    if (!fenable)
+        return VOS_STATUS_SUCCESS;
+
+    if ((in_dev = __in_dev_get_rtnl(pAdapter->dev)) != NULL)
+    {
+        for (ifap = &in_dev->ifa_list; (ifa = *ifap) != NULL;
+             ifap = &ifa->ifa_next)
+        {
+            if (!strcmp(pAdapter->dev->name, ifa->ifa_label))
+                break;
+        }
+    }
+
+    if (!ifa || !ifa->ifa_local)
+        return VOS_STATUS_SUCCESS;
+
+    add_req = vos_mem_malloc(sizeof(*add_req));
+    if (!add_req)
+        return VOS_STATUS_E_NOMEM;
+
+    vos_mem_zero(add_req, sizeof(*add_req));
+    vos_mem_copy(add_req->macAddress,
+                 pAdapter->macAddressCurrent.bytes,
+                 VOS_MAC_ADDR_SIZE);
+    vos_mem_copy(add_req->bss_address,
+                 pHddStaCtx->conn_info.bssId,
+                 VOS_MAC_ADDR_SIZE);
+    add_req->ucPtrnId = pattern_id;
+    add_req->usPtrnIntervalMs = 90000;
+    add_req->ucPtrnSize = 42;
+
+    vos_mem_set(&add_req->ucPattern[0], VOS_MAC_ADDR_SIZE, 0xFF);
+    vos_mem_copy(&add_req->ucPattern[6],
+                 pAdapter->macAddressCurrent.bytes,
+                 VOS_MAC_ADDR_SIZE);
+    add_req->ucPattern[12] = 0x08;
+    add_req->ucPattern[13] = 0x06;
+    add_req->ucPattern[14] = 0x00;
+    add_req->ucPattern[15] = 0x01;
+    add_req->ucPattern[16] = 0x08;
+    add_req->ucPattern[17] = 0x00;
+    add_req->ucPattern[18] = 6;
+    add_req->ucPattern[19] = 4;
+    add_req->ucPattern[20] = 0x00;
+    add_req->ucPattern[21] = 0x01;
+    vos_mem_copy(&add_req->ucPattern[22],
+                 pAdapter->macAddressCurrent.bytes,
+                 VOS_MAC_ADDR_SIZE);
+    vos_mem_copy(&add_req->ucPattern[28], &ifa->ifa_local, 4);
+    vos_mem_zero(&add_req->ucPattern[32], VOS_MAC_ADDR_SIZE);
+    vos_mem_copy(&add_req->ucPattern[38], &ifa->ifa_local, 4);
+
+    if (HAL_STATUS_SUCCESS(sme_AddPeriodicTxPtrn(pHddCtx->hHal, add_req)))
+    {
+        mutex_lock(&pHddCtx->op_ctx.op_lock);
+        pHddCtx->op_ctx.op_table[pattern_id].request_id = 0xFFFFFFFFU;
+        mutex_unlock(&pHddCtx->op_ctx.op_lock);
+    }
+
+    vos_mem_free(add_req);
+    return VOS_STATUS_SUCCESS;
 }
 
 void hdd_ipv4_notifier_work_queue(struct work_struct *work)

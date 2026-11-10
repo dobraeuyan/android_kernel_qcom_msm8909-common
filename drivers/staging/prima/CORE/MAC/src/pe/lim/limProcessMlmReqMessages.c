@@ -4668,9 +4668,12 @@ static void limProcessAuthRetryTimer(tpAniSirGlobal pMac)
          */
         if (LIM_AUTH_ACK_RCD_FAILURE == pMac->authAckStatus)
         {
-          /// Prepare & send Authentication frame
-          authFrameBody.authAlgoNumber =
-                 (tANI_U8) pMac->lim.gpLimMlmAuthReq->authType;
+          if (psessionEntry->limCurrentAuthType == eSIR_AUTH_TYPE_SAE &&
+              psessionEntry->sae_pmk_cached)
+            authFrameBody.authAlgoNumber = eSIR_OPEN_SYSTEM;
+          else
+            authFrameBody.authAlgoNumber =
+                   (tANI_U8) pMac->lim.gpLimMlmAuthReq->authType;
           authFrameBody.authTransactionSeqNumber = SIR_MAC_AUTH_FRAME_1;
           authFrameBody.authStatusCode = 0;
           limLog(pMac, LOGW, FL("Retry Auth "));

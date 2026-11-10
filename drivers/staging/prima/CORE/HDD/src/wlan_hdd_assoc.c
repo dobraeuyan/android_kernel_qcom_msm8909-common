@@ -1780,6 +1780,10 @@ static eHalStatus hdd_DisConnectHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo *
        wlan_hdd_decr_active_session(pHddCtx, pAdapter->device_mode);
     }
     spin_unlock_bh(&pAdapter->lock_for_active_session);
+    if (pAdapter->device_mode == WLAN_HDD_INFRA_STATION)
+    {
+        hdd_conf_periodic_arp_keepalive(pAdapter, VOS_FALSE);
+    }
     vos_flush_delayed_work(&pHddCtx->ecsa_chan_change_work);
     hdd_clearRoamProfileIe( pAdapter );
 
@@ -2725,11 +2729,14 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
                       sizeof(pAdapter->hdd_stats.hddPmfStats) );
 #endif
 
-        // Start the Queue
         if ( !hddDisconInProgress )
         {
             hddLog(VOS_TRACE_LEVEL_INFO, FL("Enabling queues"));
             netif_tx_wake_all_queues(dev);
+            if (pAdapter->device_mode == WLAN_HDD_INFRA_STATION)
+            {
+                schedule_work(&pAdapter->ipv4NotifierWorkQueue);
+            }
         }
         if (pHddCtx->cfg_ini && pHddCtx->cfg_ini->gEnableRoamDelayStats)
         {
@@ -4749,8 +4756,8 @@ static tANI_S32 hdd_ProcessGENIE(hdd_adapter_t *pAdapter,
         *pMfpRequired = (dot11RSNIE.RSN_Cap[0] >> 6) & 0x1 ;
         *pMfpCapable = (dot11RSNIE.RSN_Cap[0] >> 7) & 0x1 ;
 #endif
-        // Set the PMKSA ID Cache for this interface
-        for (i=0; i<dot11RSNIE.pmkid_count; i++)
+        for (i = 0; (*pAuthType != eCSR_AUTH_TYPE_SAE) &&
+                    (i < dot11RSNIE.pmkid_count); i++)
         {
             if ( pBssid == NULL)
             {

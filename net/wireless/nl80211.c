@@ -15159,8 +15159,15 @@ int cfg80211_external_auth_request(struct net_device *dev,
 	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wdev->wiphy);
 	struct sk_buff *msg;
 	void *hdr;
+	u32 nlportid;
 
-	if (!wdev->conn_owner_nlportid)
+	nlportid = cfg80211_find_mgmt_nlportid(wdev,
+					       IEEE80211_FTYPE_MGMT |
+					       IEEE80211_STYPE_AUTH);
+	if (!nlportid)
+		nlportid = wdev->conn_owner_nlportid;
+
+	if (!nlportid)
 		return -EINVAL;
 
 	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, gfp);
@@ -15183,7 +15190,7 @@ int cfg80211_external_auth_request(struct net_device *dev,
 
 	genlmsg_end(msg, hdr);
 	genlmsg_unicast(wiphy_net(&rdev->wiphy), msg,
-			wdev->conn_owner_nlportid);
+			nlportid);
 	return 0;
 
  nla_put_failure:

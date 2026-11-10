@@ -335,7 +335,7 @@ WDI_STATableDelSta
     }
     
     wpalMemoryZero(&pSTATable[ucSTAIdx], sizeof(pSTATable[ucSTAIdx])); 
-    pSTATable->valid = 0; 
+    pSTATable[ucSTAIdx].valid = 0;
     return WDI_STATUS_SUCCESS;
 }/*WDI_STATableDelSta*/
 

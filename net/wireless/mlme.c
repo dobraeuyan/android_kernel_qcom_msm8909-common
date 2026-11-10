@@ -575,6 +575,23 @@ void cfg80211_mlme_purge_registrations(struct wireless_dev *wdev)
 	cfg80211_process_mlme_unregistrations(rdev);
 }
 
+u32 cfg80211_find_mgmt_nlportid(struct wireless_dev *wdev, u16 frame_type)
+{
+	struct cfg80211_mgmt_registration *reg;
+	u32 nlportid = 0;
+
+	spin_lock_bh(&wdev->mgmt_registrations_lock);
+	list_for_each_entry(reg, &wdev->mgmt_registrations, list) {
+		if (reg->frame_type == cpu_to_le16(frame_type)) {
+			nlportid = reg->nlportid;
+			break;
+		}
+	}
+	spin_unlock_bh(&wdev->mgmt_registrations_lock);
+
+	return nlportid;
+}
+
 int cfg80211_mlme_mgmt_tx(struct cfg80211_registered_device *rdev,
 			  struct wireless_dev *wdev,
 			  struct cfg80211_mgmt_tx_params *params, u64 *cookie)

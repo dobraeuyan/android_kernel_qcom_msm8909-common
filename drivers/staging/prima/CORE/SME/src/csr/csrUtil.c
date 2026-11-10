@@ -4284,6 +4284,9 @@ tANI_U8 csrConstructRSNIe( tHalHandle hHal, tANI_U32 sessionId, tCsrRoamProfile 
 #ifdef FEATURE_WLAN_ESE
         (eCSR_AUTH_TYPE_CCKM_RSN != negAuthType) &&
 #endif
+#ifdef WLAN_FEATURE_SAE
+        (eCSR_AUTH_TYPE_SAE != negAuthType) &&
+#endif
         csrLookupPMKID( pMac, sessionId, &pmkid_cache))
         {
             pPMK->cPMKIDs = 1;

@@ -2767,6 +2767,13 @@ lim_process_ecsa_ie(tpAniSirGlobal mac_ctx,
         return;
     }
 
+    if (LIM_IS_STA_ROLE(session) && session->currentOperChannel <= 14) {
+        limLog(mac_ctx, LOGW,
+               FL("STA ignoring ECSA on 2.4 GHz ch %d to %d"),
+               session->currentOperChannel, ecsa_ie->new_channel);
+        return;
+    }
+
     ecsa_req.new_channel = ecsa_ie->new_channel;
     ecsa_req.op_class = ecsa_ie->new_reg_class;
     ecsa_req.switch_mode = ecsa_ie->switch_mode;
@@ -2802,6 +2809,10 @@ limUpdateChannelSwitch(struct sAniSirGlobal *pMac,  tpSirProbeRespBeacon pBeacon
 #ifdef WLAN_FEATURE_11AC
     tDot11fIEWiderBWChanSwitchAnn    *pWiderChnlSwitch;
 #endif
+
+    if (LIM_IS_STA_ROLE(psessionEntry) && psessionEntry->currentOperChannel <= 14)
+        return;
+
    if (pBeacon->ecsa_present)
        return lim_process_ecsa_ie(pMac,
                                   &pBeacon->ext_chan_switch_ann, psessionEntry);
