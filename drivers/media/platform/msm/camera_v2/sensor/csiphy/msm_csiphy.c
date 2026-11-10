@@ -2236,7 +2236,7 @@ static long msm_csiphy_subdev_ioctl(struct v4l2_subdev *sd,
 	case VIDIOC_MSM_CSIPHY_IO_CFG:
 		rc = 0;
 		if (arg)
-			pr_err("DIAG cphy: CSIPHY_IO_CFG cfgtype=%d\n",
+			pr_debug("DIAG cphy: CSIPHY_IO_CFG cfgtype=%d\n",
 				((struct csiphy_cfg_data *)arg)->cfgtype);
 		if (adsp_shmem_get_state() == CAMERA_STATUS_END)
 			rc = msm_csiphy_cmd(csiphy_dev, arg);

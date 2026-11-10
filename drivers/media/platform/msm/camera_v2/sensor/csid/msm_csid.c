@@ -838,11 +838,11 @@ static long msm_csid_subdev_ioctl(struct v4l2_subdev *sd,
 		rc = msm_csid_get_subdev_id(csid_dev, arg);
 		break;
 	case VIDIOC_MSM_CSID_IO_CFG:
-		pr_err("DIAG csid_io: cmd=%#x cfgtype=%d state=%d\n", cmd,
+		pr_debug("DIAG csid_io: cmd=%#x cfgtype=%d state=%d\n", cmd,
 			arg ? ((struct csid_cfg_data *)arg)->cfgtype : -999,
 			csid_dev->csid_state);
 		rc = msm_csid_cmd(csid_dev, arg);
-		pr_err("DIAG csid_io: msm_csid_cmd() = %d\n", rc);
+		pr_debug("DIAG csid_io: msm_csid_cmd() = %d\n", rc);
 		break;
 	case MSM_SD_NOTIFY_FREEZE:
 		if (csid_dev->csid_state != CSID_POWER_UP)

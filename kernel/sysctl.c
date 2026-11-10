@@ -1650,7 +1650,7 @@ static struct ctl_table vm_table[] = {
 		.mode		= 0644,
 		.proc_handler	= watermark_scale_factor_sysctl_handler,
 		.extra1		= &zero,
-		.extra2		= &zero,
+		.extra2		= &one_thousand,
 	},
 	{
 		.procname	= "extra_free_kbytes",

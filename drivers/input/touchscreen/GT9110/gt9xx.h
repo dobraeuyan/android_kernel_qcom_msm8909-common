@@ -349,7 +349,7 @@ extern int gtp_int_gpio;
 
 #define CFG_GROUP_LEN(p_cfg_grp)  (sizeof(p_cfg_grp) / sizeof(p_cfg_grp[0]))
 // Log define
-#define GTP_INFO(fmt,arg...)           printk("<<-GTP-INFO->> "fmt"\n",##arg)
+#define GTP_INFO(fmt,arg...)           pr_debug("<<-GTP-INFO->> "fmt"\n",##arg)
 #define GTP_ERROR(fmt,arg...)          printk("<<-GTP-ERROR->> "fmt"\n",##arg)
 #define GTP_DEBUG(fmt,arg...)          do{\
                                          if(GTP_DEBUG_ON)\
