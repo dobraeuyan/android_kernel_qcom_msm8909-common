@@ -1782,6 +1782,7 @@ static eHalStatus hdd_DisConnectHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo *
     spin_unlock_bh(&pAdapter->lock_for_active_session);
     if (pAdapter->device_mode == WLAN_HDD_INFRA_STATION)
     {
+        pAdapter->arpKeepAliveRetries = 0;
         hdd_conf_periodic_arp_keepalive(pAdapter, VOS_FALSE);
     }
     vos_flush_delayed_work(&pHddCtx->ecsa_chan_change_work);
@@ -2735,6 +2736,7 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
             netif_tx_wake_all_queues(dev);
             if (pAdapter->device_mode == WLAN_HDD_INFRA_STATION)
             {
+                pAdapter->arpKeepAliveRetries = 0;
                 schedule_work(&pAdapter->ipv4NotifierWorkQueue);
             }
         }

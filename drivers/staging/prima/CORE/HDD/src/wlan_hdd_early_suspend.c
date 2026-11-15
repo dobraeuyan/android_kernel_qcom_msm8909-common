@@ -80,6 +80,10 @@
 
 #include <linux/wcnss_wlan.h>
 #include <linux/inetdevice.h>
+#include <linux/rtnetlink.h>
+#include <linux/err.h>
+#include <net/route.h>
+#include <net/arp.h>
 #include <wlan_hdd_cfg.h>
 #include <wlan_hdd_cfg80211.h>
 #include <net/addrconf.h>
@@ -1047,18 +1051,114 @@ void __hdd_ipv4_notifier_work_queue(struct work_struct *work)
     EXIT();
 }
 
+static void hdd_arp_ka_mark(hdd_context_t *pHddCtx, v_BOOL_t installed)
+{
+#ifdef WLAN_FEATURE_OFFLOAD_PACKETS
+    mutex_lock(&pHddCtx->op_ctx.op_lock);
+    pHddCtx->op_ctx.op_table[MAXNUM_PERIODIC_TX_PTRNS - 1].request_id =
+        installed ? HDD_ARP_KA_SLOT_SET : HDD_ARP_KA_SLOT_FREE;
+    mutex_unlock(&pHddCtx->op_ctx.op_lock);
+#else
+    pHddCtx->arp_keepalive_set = installed;
+#endif
+}
+
+static v_BOOL_t hdd_arp_ka_is_set(hdd_context_t *pHddCtx)
+{
+#ifdef WLAN_FEATURE_OFFLOAD_PACKETS
+    v_BOOL_t set;
+
+    mutex_lock(&pHddCtx->op_ctx.op_lock);
+    set = (pHddCtx->op_ctx.op_table[MAXNUM_PERIODIC_TX_PTRNS - 1].request_id ==
+           HDD_ARP_KA_SLOT_SET);
+    mutex_unlock(&pHddCtx->op_ctx.op_lock);
+    return set;
+#else
+    return pHddCtx->arp_keepalive_set;
+#endif
+}
+
+static int hdd_arp_ka_resolve(struct net_device *dev, __be32 *local,
+                              __be32 *gw, u8 *gw_mac, int *unicast)
+{
+    struct in_device *in_dev;
+    struct in_ifaddr *ifa = NULL;
+    struct flowi4 fl4;
+    struct rtable *rt;
+    struct neighbour *neigh;
+    __be32 addr = 0;
+
+    *unicast = 0;
+    *gw = 0;
+    vos_mem_zero(gw_mac, VOS_MAC_ADDR_SIZE);
+
+    rtnl_lock();
+    in_dev = __in_dev_get_rtnl(dev);
+    if (in_dev)
+    {
+        for (ifa = in_dev->ifa_list; ifa; ifa = ifa->ifa_next)
+        {
+            if (!strcmp(dev->name, ifa->ifa_label))
+                break;
+        }
+        if (ifa)
+            addr = ifa->ifa_local;
+    }
+    rtnl_unlock();
+
+    if (!addr)
+        return -EINVAL;
+
+    *local = addr;
+    vos_mem_zero(&fl4, sizeof(fl4));
+    fl4.flowi4_oif = dev->ifindex;
+    fl4.saddr = addr;
+    fl4.daddr = htonl(0x08080808);
+
+    rt = ip_route_output_key(dev_net(dev), &fl4);
+    if (IS_ERR(rt))
+        return -EINVAL;
+
+    if (rt->rt_uses_gateway)
+        *gw = rt->rt_gateway;
+    ip_rt_put(rt);
+
+    if (!*gw)
+        return -EINVAL;
+
+    neigh = neigh_lookup(&arp_tbl, gw, dev);
+    if (neigh)
+    {
+        if (neigh->nud_state & NUD_VALID)
+        {
+            neigh_ha_snapshot((char *)gw_mac, neigh, dev);
+            *unicast = 1;
+        }
+        neigh_release(neigh);
+    }
+
+    if (!*unicast)
+    {
+        arp_send(ARPOP_REQUEST, ETH_P_ARP, *gw, dev, addr,
+                 NULL, dev->dev_addr, NULL);
+    }
+
+    return 0;
+}
+
 VOS_STATUS hdd_conf_periodic_arp_keepalive(hdd_adapter_t *pAdapter,
                                            v_BOOL_t fenable)
 {
     hdd_context_t *pHddCtx;
     hdd_station_ctx_t *pHddStaCtx;
-    struct in_device *in_dev;
-    struct in_ifaddr **ifap = NULL;
-    struct in_ifaddr *ifa = NULL;
     struct sSirAddPeriodicTxPtrn *add_req;
     struct sSirDelPeriodicTxPtrn *del_req;
     uint8_t pattern_id = MAXNUM_PERIODIC_TX_PTRNS - 1;
-    uint8_t active = 0;
+    __be32 local = 0;
+    __be32 gw = 0;
+    u8 gw_mac[VOS_MAC_ADDR_SIZE];
+    int unicast = 0;
+    VOS_STATUS status = VOS_STATUS_SUCCESS;
 
     if (NULL == pAdapter)
         return VOS_STATUS_E_FAILURE;
@@ -1071,44 +1171,63 @@ VOS_STATUS hdd_conf_periodic_arp_keepalive(hdd_adapter_t *pAdapter,
     if (NULL == pHddStaCtx)
         return VOS_STATUS_E_FAILURE;
 
-    mutex_lock(&pHddCtx->op_ctx.op_lock);
-    if (pHddCtx->op_ctx.op_table[pattern_id].request_id == 0xFFFFFFFFU)
+    if (!fenable)
     {
-        pHddCtx->op_ctx.op_table[pattern_id].request_id = 0;
-        active = 1;
+        pAdapter->arpKeepAliveRetries = 0;
+        cancel_delayed_work(&pAdapter->arpKeepAliveWork);
     }
-    mutex_unlock(&pHddCtx->op_ctx.op_lock);
 
-    if (active)
+    if (hdd_arp_ka_is_set(pHddCtx))
     {
         del_req = vos_mem_malloc(sizeof(*del_req));
-        if (del_req)
+        if (!del_req)
+            return VOS_STATUS_E_NOMEM;
+
+        vos_mem_zero(del_req, sizeof(*del_req));
+        vos_mem_copy(del_req->macAddress,
+                     pAdapter->macAddressCurrent.bytes,
+                     VOS_MAC_ADDR_SIZE);
+        del_req->ucPatternIdBitmap = (1 << pattern_id);
+        if (!HAL_STATUS_SUCCESS(sme_DelPeriodicTxPtrn(pHddCtx->hHal, del_req)))
         {
-            vos_mem_zero(del_req, sizeof(*del_req));
-            vos_mem_copy(del_req->macAddress,
-                         pAdapter->macAddressCurrent.bytes,
-                         VOS_MAC_ADDR_SIZE);
-            del_req->ucPatternIdBitmap = (1 << pattern_id);
-            sme_DelPeriodicTxPtrn(pHddCtx->hHal, del_req);
             vos_mem_free(del_req);
+            hddLog(LOGE, FL("sme_DelPeriodicTxPtrn failed"));
+            return VOS_STATUS_E_FAILURE;
         }
+        vos_mem_free(del_req);
+        hdd_arp_ka_mark(pHddCtx, VOS_FALSE);
     }
 
     if (!fenable)
         return VOS_STATUS_SUCCESS;
 
-    if ((in_dev = __in_dev_get_rtnl(pAdapter->dev)) != NULL)
+    if (eConnectionState_Associated != pHddStaCtx->conn_info.connState)
+        return VOS_STATUS_SUCCESS;
+
+    if (hdd_arp_ka_resolve(pAdapter->dev, &local, &gw, gw_mac, &unicast))
     {
-        for (ifap = &in_dev->ifa_list; (ifa = *ifap) != NULL;
-             ifap = &ifa->ifa_next)
+        if (pAdapter->arpKeepAliveRetries < 20)
         {
-            if (!strcmp(pAdapter->dev->name, ifa->ifa_label))
-                break;
+            pAdapter->arpKeepAliveRetries++;
+            schedule_delayed_work(&pAdapter->arpKeepAliveWork,
+                                  msecs_to_jiffies(500));
         }
+        else
+        {
+            hddLog(LOG1, FL("no gateway for periodic ARP"));
+        }
+        return VOS_STATUS_SUCCESS;
     }
 
-    if (!ifa || !ifa->ifa_local)
+    if (!unicast && pAdapter->arpKeepAliveRetries < 6)
+    {
+        pAdapter->arpKeepAliveRetries++;
+        schedule_delayed_work(&pAdapter->arpKeepAliveWork,
+                              msecs_to_jiffies(500));
         return VOS_STATUS_SUCCESS;
+    }
+
+    pAdapter->arpKeepAliveRetries = 0;
 
     add_req = vos_mem_malloc(sizeof(*add_req));
     if (!add_req)
@@ -1125,7 +1244,11 @@ VOS_STATUS hdd_conf_periodic_arp_keepalive(hdd_adapter_t *pAdapter,
     add_req->usPtrnIntervalMs = 90000;
     add_req->ucPtrnSize = 42;
 
-    vos_mem_set(&add_req->ucPattern[0], VOS_MAC_ADDR_SIZE, 0xFF);
+    if (unicast)
+        vos_mem_copy(&add_req->ucPattern[0], gw_mac, VOS_MAC_ADDR_SIZE);
+    else
+        vos_mem_set(&add_req->ucPattern[0], VOS_MAC_ADDR_SIZE, 0xFF);
+
     vos_mem_copy(&add_req->ucPattern[6],
                  pAdapter->macAddressCurrent.bytes,
                  VOS_MAC_ADDR_SIZE);
@@ -1142,19 +1265,49 @@ VOS_STATUS hdd_conf_periodic_arp_keepalive(hdd_adapter_t *pAdapter,
     vos_mem_copy(&add_req->ucPattern[22],
                  pAdapter->macAddressCurrent.bytes,
                  VOS_MAC_ADDR_SIZE);
-    vos_mem_copy(&add_req->ucPattern[28], &ifa->ifa_local, 4);
+    vos_mem_copy(&add_req->ucPattern[28], &local, 4);
     vos_mem_zero(&add_req->ucPattern[32], VOS_MAC_ADDR_SIZE);
-    vos_mem_copy(&add_req->ucPattern[38], &ifa->ifa_local, 4);
+    vos_mem_copy(&add_req->ucPattern[38], &gw, 4);
 
     if (HAL_STATUS_SUCCESS(sme_AddPeriodicTxPtrn(pHddCtx->hHal, add_req)))
     {
-        mutex_lock(&pHddCtx->op_ctx.op_lock);
-        pHddCtx->op_ctx.op_table[pattern_id].request_id = 0xFFFFFFFFU;
-        mutex_unlock(&pHddCtx->op_ctx.op_lock);
+        hdd_arp_ka_mark(pHddCtx, VOS_TRUE);
+    }
+    else
+    {
+        hddLog(LOGE, FL("sme_AddPeriodicTxPtrn failed"));
+        status = VOS_STATUS_E_FAILURE;
     }
 
     vos_mem_free(add_req);
-    return VOS_STATUS_SUCCESS;
+    return status;
+}
+
+static void __hdd_arp_keepalive_work_cb(struct work_struct *work)
+{
+    hdd_adapter_t *pAdapter =
+        container_of(work, hdd_adapter_t, arpKeepAliveWork.work);
+    hdd_context_t *pHddCtx;
+
+    if (NULL == pAdapter)
+        return;
+
+    pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+    if (0 != wlan_hdd_validate_context(pHddCtx))
+        return;
+
+    if (eConnectionState_Associated ==
+        (WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))->conn_info.connState)
+    {
+        hdd_conf_periodic_arp_keepalive(pAdapter, VOS_TRUE);
+    }
+}
+
+void hdd_arp_keepalive_work_cb(struct work_struct *work)
+{
+    vos_ssr_protect(__func__);
+    __hdd_arp_keepalive_work_cb(work);
+    vos_ssr_unprotect(__func__);
 }
 
 void hdd_ipv4_notifier_work_queue(struct work_struct *work)
@@ -1217,12 +1370,13 @@ int __wlan_hdd_ipv4_changed(struct notifier_block *nb,
                     if (!strcmp(pAdapterNode->pAdapter->dev->name,
                           ifa->ifa_label))
                     {
-                        break; /* found */
+                        break;
                     }
                 }
             }
             if(ifa && ifa->ifa_local)
             {
+                pAdapterNode->pAdapter->arpKeepAliveRetries = 0;
                 schedule_work(&pAdapterNode->pAdapter->ipv4NotifierWorkQueue);
             }
             break;
@@ -1774,9 +1928,6 @@ void hdd_suspend_wlan(void)
            continue;
        }
        dev_hold(pAdapter->dev);
-       /* Avoid multiple enter/exit BMPS in this while loop using
-        * hdd_enter_bmps flag
-        */
        if (FALSE == hdd_enter_bmps && (BMPS == pmcGetPmcState(pHddCtx->hHal)))
        {
             hdd_enter_bmps = TRUE;

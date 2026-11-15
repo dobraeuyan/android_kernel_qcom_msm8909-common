@@ -471,10 +471,13 @@ static void hdd_init_offloaded_packets_ctx(hdd_context_t *hdd_ctx)
         hdd_ctx->op_ctx.op_table[i].request_id = 0;
         hdd_ctx->op_ctx.op_table[i].pattern_id = i;
     }
+    hdd_ctx->op_ctx.op_table[MAXNUM_PERIODIC_TX_PTRNS - 1].request_id =
+        HDD_ARP_KA_SLOT_FREE;
 }
 #else
 static void hdd_init_offloaded_packets_ctx(hdd_context_t *hdd_ctx)
 {
+    hdd_ctx->arp_keepalive_set = VOS_FALSE;
 }
 #endif
 
@@ -10075,8 +10078,8 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
             goto err_free_netdev;
          }
 
-         // Workqueue which gets scheduled in IPv4 notification callback.
          vos_init_work(&pAdapter->ipv4NotifierWorkQueue, hdd_ipv4_notifier_work_queue);
+         vos_init_delayed_work(&pAdapter->arpKeepAliveWork, hdd_arp_keepalive_work_cb);
 
 #ifdef WLAN_NS_OFFLOAD
          // Workqueue which gets scheduled in IPv6 notification callback.
@@ -10130,9 +10133,10 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
 
          hdd_set_conparam( 1 );
 
-         // Workqueue which gets scheduled in IPv4 notification callback.
          vos_init_work(&pAdapter->ipv4NotifierWorkQueue,
                        hdd_ipv4_notifier_work_queue);
+         vos_init_delayed_work(&pAdapter->arpKeepAliveWork,
+                               hdd_arp_keepalive_work_cb);
 
 #ifdef WLAN_NS_OFFLOAD
          // Workqueue which gets scheduled in IPv6 notification callback.
@@ -10824,6 +10828,7 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
          vos_flush_work(&pAdapter->ipv6NotifierWorkQueue);
 #endif
 
+         vos_flush_delayed_work(&pAdapter->arpKeepAliveWork);
          vos_flush_work(&pAdapter->ipv4NotifierWorkQueue);
 
          /* It is possible that the caller of this function does not
@@ -10954,6 +10959,7 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
 #ifdef WLAN_NS_OFFLOAD
          vos_flush_work(&pAdapter->ipv6NotifierWorkQueue);
 #endif
+         vos_flush_delayed_work(&pAdapter->arpKeepAliveWork);
          vos_flush_work(&pAdapter->ipv4NotifierWorkQueue);
 
          break;
@@ -13442,64 +13448,37 @@ static int hdd_generate_iface_mac_addr_auto(hdd_context_t *pHddCtx,
    unsigned int serialno;
    serialno = wcnss_get_serial_number();
 
-   if (0 == idx)
+   if (0 != serialno)
    {
-      if (0 != serialno)
-      {
-         for (i = 0; i < VOS_MAX_CONCURRENCY_PERSONA; i++)
-         {
-            pHddCtx->cfg_ini->intfMacAddr[i].bytes[0] = 0x02;
-            pHddCtx->cfg_ini->intfMacAddr[i].bytes[1] = (serialno >> 24) & 0xFF;
-            pHddCtx->cfg_ini->intfMacAddr[i].bytes[2] = (serialno >> 16) & 0xFF;
-            pHddCtx->cfg_ini->intfMacAddr[i].bytes[3] = (serialno >> 8) & 0xFF;
-            pHddCtx->cfg_ini->intfMacAddr[i].bytes[4] = serialno & 0xFF;
-            pHddCtx->cfg_ini->intfMacAddr[i].bytes[5] = (v_U8_t)i;
+      serialno &= 0x00FFFFFF;
+      serialno *= VOS_MAX_CONCURRENCY_PERSONA;
 
-            hddLog(VOS_TRACE_LEVEL_ERROR,
-                   "%s: Derived IEEE LAA Mac Addr: "
-                   MAC_ADDRESS_STR, __func__,
-                   MAC_ADDR_ARRAY(pHddCtx->cfg_ini->intfMacAddr[i].bytes));
-         }
-      }
-      else
-      {
-         eth_random_addr(pHddCtx->cfg_ini->intfMacAddr[0].bytes);
-         hddLog(VOS_TRACE_LEVEL_ERROR,
-                "%s: Serial NO is 0; generated random LAA Mac Addr: "
-                MAC_ADDRESS_STR, __func__,
-                MAC_ADDR_ARRAY(pHddCtx->cfg_ini->intfMacAddr[0].bytes));
-
-         for (i = 1; i < VOS_MAX_CONCURRENCY_PERSONA; i++)
-         {
-            pHddCtx->cfg_ini->intfMacAddr[i] = pHddCtx->cfg_ini->intfMacAddr[0];
-            pHddCtx->cfg_ini->intfMacAddr[i].bytes[5] ^= (v_U8_t)i;
-            hddLog(VOS_TRACE_LEVEL_ERROR,
-                   "%s: Derived random secondary Mac Addr: "
-                   MAC_ADDRESS_STR, __func__,
-                   MAC_ADDR_ARRAY(pHddCtx->cfg_ini->intfMacAddr[i].bytes));
-         }
-      }
-   }
-   else
-   {
       for (i = idx; i < VOS_MAX_CONCURRENCY_PERSONA; i++)
       {
          pHddCtx->cfg_ini->intfMacAddr[i] = mac_addr;
-         pHddCtx->cfg_ini->intfMacAddr[i].bytes[0] |= 0x02;
-         pHddCtx->cfg_ini->intfMacAddr[i].bytes[5] ^= (v_U8_t)i;
+         pHddCtx->cfg_ini->intfMacAddr[i].bytes[3] =
+                                         (serialno >> 16) & 0xFF;
+         pHddCtx->cfg_ini->intfMacAddr[i].bytes[4] =
+                                          (serialno >> 8) & 0xFF;
+         pHddCtx->cfg_ini->intfMacAddr[i].bytes[5] = serialno & 0xFF;
 
          if (0 == memcmp(&pHddCtx->cfg_ini->intfMacAddr[i].bytes[0],
                          &mac_addr.bytes[0], VOS_MAC_ADDR_SIZE))
          {
-            pHddCtx->cfg_ini->intfMacAddr[i].bytes[5] =
-               (pHddCtx->cfg_ini->intfMacAddr[i].bytes[5] + 1) & 0xFF;
+            pHddCtx->cfg_ini->intfMacAddr[i].bytes[5] +=
+                                            VOS_MAX_CONCURRENCY_PERSONA;
          }
 
+         serialno++;
          hddLog(VOS_TRACE_LEVEL_ERROR,
-                "%s: Derived secondary Mac Addr: "
-                MAC_ADDRESS_STR, __func__,
+                "%s: Derived Mac Addr: " MAC_ADDRESS_STR, __func__,
                 MAC_ADDR_ARRAY(pHddCtx->cfg_ini->intfMacAddr[i].bytes));
       }
+   }
+   else
+   {
+      hddLog(LOGE, FL("Failed to Get Serial NO"));
+      return -1;
    }
 
    return 0;

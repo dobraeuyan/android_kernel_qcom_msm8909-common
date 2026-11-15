@@ -1168,6 +1168,8 @@ struct hdd_adapter_s
     
    /** IPv4 notifier callback for handling ARP offload on change in IP */
    struct work_struct  ipv4NotifierWorkQueue;
+   struct delayed_work arpKeepAliveWork;
+   tANI_U8 arpKeepAliveRetries;
 
    //TODO Move this to sta Ctx
    struct wireless_dev wdev ;
@@ -1535,6 +1537,8 @@ struct hdd_ext_scan_context {
 #endif /* End of WLAN_FEATURE_EXTSCAN */
 
 #ifdef WLAN_FEATURE_OFFLOAD_PACKETS
+#define HDD_ARP_KA_SLOT_FREE 0xFFFFFFFEU
+#define HDD_ARP_KA_SLOT_SET  0xFFFFFFFFU
 /**
  * struct hdd_offloaded_packets - request id to pattern id mapping
  * @request_id: request id
@@ -1659,6 +1663,9 @@ struct hdd_context_s
 
    /* Track whether ignore DTIM is enabled*/
    v_BOOL_t hdd_ignore_dtim_enabled;
+#ifndef WLAN_FEATURE_OFFLOAD_PACKETS
+   v_BOOL_t arp_keepalive_set;
+#endif
    v_U32_t hdd_actual_ignore_DTIM_value;
    v_U32_t hdd_actual_LI_value; 
 
@@ -2048,6 +2055,7 @@ v_BOOL_t hdd_is_valid_mac_address(const tANI_U8* pMacAddr);
 VOS_STATUS hdd_issta_p2p_clientconnected(hdd_context_t *pHddCtx);
 VOS_STATUS hdd_is_any_session_connected(hdd_context_t *pHddCtx);
 void hdd_ipv4_notifier_work_queue(struct work_struct *work);
+void hdd_arp_keepalive_work_cb(struct work_struct *work);
 VOS_STATUS hdd_conf_periodic_arp_keepalive(hdd_adapter_t *pAdapter,
                                            v_BOOL_t fenable);
 v_BOOL_t hdd_isConnectionInProgress(hdd_context_t *pHddCtx, v_U8_t *session_id,

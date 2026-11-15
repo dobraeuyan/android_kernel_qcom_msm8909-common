@@ -380,7 +380,20 @@ static void __schBeaconProcessForSession( tpAniSirGlobal      pMac,
             PELOGE(schLog(pMac, LOGE, FL("Channel Change from %d --> %d  - "
                                          "Ignoring beacon!"),
                           psessionEntry->currentOperChannel, pBeacon->channelNumber);)
-           goto fail;
+            if ((eLIM_STA_ROLE == psessionEntry->limSystemRole) &&
+                (psessionEntry->currentOperChannel <= 14) &&
+                (psessionEntry->limMlmState == eLIM_MLM_LINK_ESTABLISHED_STATE))
+            {
+                pStaDs = dphGetHashEntry(pMac, DPH_STA_HASH_INDEX_PEER,
+                                         &psessionEntry->dph.dphHashTable);
+                if ((pStaDs != NULL) && (!pStaDs->isDisassocDeauthInProgress))
+                {
+                    pStaDs->isDisassocDeauthInProgress++;
+                    limTearDownLinkWithAp(pMac, psessionEntry->peSessionId,
+                                          eSIR_BEACON_MISSED);
+                }
+            }
+            goto fail;
         }
 
         if (psessionEntry->gLimSpecMgmt.dfs_channel_csa) {
