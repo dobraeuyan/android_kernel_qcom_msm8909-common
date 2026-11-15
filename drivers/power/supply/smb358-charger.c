@@ -247,6 +247,7 @@ struct smb358_charger {
 	struct mutex		irq_complete;
 	
 	u8			irq_cfg_mask[2];
+	bool			irq_cfg_saved;
 	int			irq_gpio;
 	int			charging_disabled;
 	int			battery_id_info;
@@ -1186,54 +1187,6 @@ static enum power_supply_property smb358_battery_properties[] = {
 	POWER_SUPPLY_PROP_SYSTEM_TEMP_LEVEL,
 };
 
-static int smb358_get_prop_batt_status(struct smb358_charger *chip)
-{
-	int rc;
-	u8 reg = 0;
-
-	if (chip->batt_full)
-		return POWER_SUPPLY_STATUS_FULL;
-
-	rc = smb358_read_reg(chip, STATUS_C_REG, &reg);
-	if (rc) {
-		dev_err(chip->dev, "Couldn't read STAT_C rc = %d\n", rc);
-		return POWER_SUPPLY_STATUS_UNKNOWN;
-	}
-
-	if (reg & STATUS_C_CHG_HOLD_OFF_BIT)
-		return POWER_SUPPLY_STATUS_NOT_CHARGING;
-
-	/*
-	 * Gate CHARGING on chip->chg_present (real VBUS, tracked by the APSD /
-	 * input-UV IRQs). The STATUS_C charging bits can stay latched from a
-	 * stale charge FSM state even with no charger attached; without this
-	 * guard the "battery" node reports CHARGING with nothing plugged. This
-	 * matches the Lenovo vendor SMB358 driver (the generic CAF/CM driver
-	 * this is derived from omits it).
-	 */
-	if ((reg & STATUS_C_CHARGING_MASK) &&
-			!(reg & STATUS_C_CHG_ERR_STATUS_BIT) &&
-			chip->chg_present)
-		return POWER_SUPPLY_STATUS_CHARGING;
-
-	return POWER_SUPPLY_STATUS_DISCHARGING;
-}
-
-static int smb358_get_prop_batt_present(struct smb358_charger *chip)
-{
-	return !chip->battery_missing;
-}
-
-/*
- * Resolve the bms fuel-gauge power_supply, caching it on first success. It is
- * normally populated by smb358_external_power_changed(), but that only runs if
- * the power-supply core delivers a supply-change notification. On bamboo the
- * gauge (bq27500, registered as "bms") can probe after this charger and never
- * trigger that callback, leaving chip->bms_psy NULL so capacity/current_now/
- * charge_counter fall back to the SMB358_DEFAULT_BATT_CAPACITY / -EINVAL stubs
- * (dumpsys battery then shows 50%, current -22, charge_counter -22). Resolve it
- * lazily by name here as a robust fallback for any probe order.
- */
 static struct power_supply *smb358_bms_psy(struct smb358_charger *chip)
 {
 	if (!chip->bms_psy && chip->bms_psy_name)
@@ -1241,14 +1194,6 @@ static struct power_supply *smb358_bms_psy(struct smb358_charger *chip)
 	return chip->bms_psy;
 }
 
-/*
- * Read one property off the gauge. power_supply_get_property() leaves *val
- * untouched when the gauge does not implement the property, so a caller that
- * ignores the return code silently reports the zero-initialised value as if it
- * were a real reading -- that is how charge_counter ended up pinned at 0 on
- * bamboo, whose bq27xxx gauge has no CHARGE_COUNTER. Report success separately
- * so callers can fall back.
- */
 static bool smb358_bms_read(struct smb358_charger *chip,
 		enum power_supply_property psp, int *val)
 {
@@ -1262,6 +1207,38 @@ static bool smb358_bms_read(struct smb358_charger *chip,
 
 	*val = ret.intval;
 	return true;
+}
+
+static int smb358_get_prop_batt_status(struct smb358_charger *chip)
+{
+	int rc;
+	u8 reg = 0;
+
+	if (!chip->chg_present)
+		return POWER_SUPPLY_STATUS_DISCHARGING;
+
+	if (chip->batt_full)
+		return POWER_SUPPLY_STATUS_FULL;
+
+	rc = smb358_read_reg(chip, STATUS_C_REG, &reg);
+	if (rc) {
+		dev_err(chip->dev, "Couldn't read STAT_C rc = %d\n", rc);
+		return POWER_SUPPLY_STATUS_UNKNOWN;
+	}
+
+	if (reg & STATUS_C_CHG_HOLD_OFF_BIT)
+		return POWER_SUPPLY_STATUS_NOT_CHARGING;
+
+	if ((reg & STATUS_C_CHARGING_MASK) &&
+			!(reg & STATUS_C_CHG_ERR_STATUS_BIT))
+		return POWER_SUPPLY_STATUS_CHARGING;
+
+	return POWER_SUPPLY_STATUS_NOT_CHARGING;
+}
+
+static int smb358_get_prop_batt_present(struct smb358_charger *chip)
+{
+	return !chip->battery_missing;
 }
 
 static int smb358_get_prop_batt_current_now(struct smb358_charger *chip)
@@ -1990,7 +1967,7 @@ static int chg_uv(struct smb358_charger *chip, u8 status)
 
 	if (status != 0) {
 		chip->chg_present = false;
-		/* Cable out: drop the APSD-detected port type. */
+		chip->batt_full = false;
 		chip->usb_supply_type = POWER_SUPPLY_TYPE_USB;
 		smb358_usb_psy_desc.type = POWER_SUPPLY_TYPE_USB;
 	}
@@ -1998,10 +1975,11 @@ static int chg_uv(struct smb358_charger *chip, u8 status)
 	rc = smb358_charging_disable(chip, SOC, false);
 	if (chip->usb_psy)
 		power_supply_changed(chip->usb_psy);
+	if (chip->batt_psy)
+		power_supply_changed(chip->batt_psy);
 
 	smb358_notify_extcon(chip);
 
-	/* Cable in: start watching the pack. Cable out: release any hold. */
 	smb358_temp_kick(chip);
 
 	return 0;
@@ -2926,25 +2904,30 @@ static int smb358_suspend(struct device *dev)
 	int rc;
 	int i;
 
-	for (i = 0; i < 2; i++) {
-		rc = smb358_read_reg(chip, FAULT_INT_REG + i, &chip->irq_cfg_mask[i]);
-		if (rc)
-			dev_err(chip->dev,
-				"Couldn't save irq cfg regs rc = %d\n", rc);
+	if (chip->chg_present) {
+		for (i = 0; i < 2; i++) {
+			rc = smb358_read_reg(chip, FAULT_INT_REG + i, &chip->irq_cfg_mask[i]);
+			if (rc)
+				dev_err(chip->dev,
+					"Couldn't save irq cfg regs rc = %d\n", rc);
+		}
+
+		rc = smb358_write_reg(chip, FAULT_INT_REG,
+				FAULT_INT_HOT_COLD_HARD_BIT | FAULT_INT_INPUT_UV_BIT);
+		if (rc < 0)
+			dev_err(chip->dev, "Couldn't set fault_irq_cfg rc = %d\n", rc);
+
+		rc = smb358_write_reg(chip, STATUS_INT_REG,
+				STATUS_INT_LOW_BATT_BIT | STATUS_INT_MISSING_BATT_BIT |
+				STATUS_INT_CHGING_BIT | STATUS_INT_INOK_BIT |
+				STATUS_INT_OTG_DETECT_BIT | STATUS_INT_CHG_INHI_BIT);
+		if (rc < 0)
+			dev_err(chip->dev, "Couldn't set status_irq_cfg rc = %d\n", rc);
+
+		chip->irq_cfg_saved = true;
+	} else {
+		chip->irq_cfg_saved = false;
 	}
-
-	/* enable wake up IRQs */
-	rc = smb358_write_reg(chip, FAULT_INT_REG,
-			FAULT_INT_HOT_COLD_HARD_BIT | FAULT_INT_INPUT_UV_BIT);
-	if (rc < 0)
-		dev_err(chip->dev, "Couldn't set fault_irq_cfg rc = %d\n", rc);
-
-	rc = smb358_write_reg(chip, STATUS_INT_REG,
-			STATUS_INT_LOW_BATT_BIT | STATUS_INT_MISSING_BATT_BIT |
-			STATUS_INT_CHGING_BIT | STATUS_INT_INOK_BIT |
-			STATUS_INT_OTG_DETECT_BIT | STATUS_INT_CHG_INHI_BIT);
-	if (rc < 0)
-		dev_err(chip->dev, "Couldn't set status_irq_cfg rc = %d\n", rc);
 
 	mutex_lock(&chip->irq_complete);
 	if (chip->vcc_i2c) {
@@ -2989,12 +2972,14 @@ static int smb358_resume(struct device *dev)
 		}
 	}
 
-	/* Restore IRQ config */
-	for (i = 0; i < 2; i++) {
-		rc = smb358_write_reg(chip, FAULT_INT_REG + i, chip->irq_cfg_mask[i]);
-		if (rc)
-			dev_err(chip->dev,
-				"Couldn't restore irq cfg regs rc=%d\n", rc);
+	if (chip->irq_cfg_saved) {
+		for (i = 0; i < 2; i++) {
+			rc = smb358_write_reg(chip, FAULT_INT_REG + i, chip->irq_cfg_mask[i]);
+			if (rc)
+				dev_err(chip->dev,
+					"Couldn't restore irq cfg regs rc=%d\n", rc);
+		}
+		chip->irq_cfg_saved = false;
 	}
 
 	mutex_lock(&chip->irq_complete);
