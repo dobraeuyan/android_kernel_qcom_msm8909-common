@@ -213,13 +213,31 @@
 				bias-disable;
 			};
 		};
+
+		usb_otg_select_default: usb_otg_select_default {
+			mux {
+				pins = "gpio0";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio0";
+				drive-strength = <2>;
+				bias-disable;
+				output-high;
+			};
+		};
 	};
 };
 
 &usb_otg {
-	qcom,hsusb-otg-mode = <1>;
+	interrupts = <0 134 0>, <0 140 0>, <0 136 0>;
+	interrupt-names = "core_irq", "async_irq", "phy_irq";
+	qcom,hsusb-otg-mode = <3>;
 	vbus_otg-supply = <&smb358_otg_supply>;
 	extcon = <&smb358_otg_supply>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&usb_otg_select_default>;
 };
 
 &i2c_1 {
@@ -301,6 +319,7 @@
 		si-en,sdb-gpio = <&msm_gpio 27 0x0>;
 		si-en,led-name = "white-notification";
 		si-en,max-current-ua = <5000>;
+		si-en,boot-blink;
 	};
 };
 

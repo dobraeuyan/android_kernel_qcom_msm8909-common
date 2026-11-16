@@ -240,6 +240,7 @@ struct msm_otg_platform_data {
 
 #define PM_QOS_SAMPLE_SEC	2
 #define PM_QOS_THRESHOLD	400
+#define MSM_ID_STATUS_DELAY	50
 
 enum msm_otg_phy_reg_mode {
 	USB_PHY_REG_OFF,
@@ -1324,7 +1325,8 @@ static irqreturn_t msm_otg_phy_irq_handler(int irq, void *data)
 		msm_otg_kick_sm_work(motg);
 	} else {
 		pr_debug("PHY ID IRQ outside LPM\n");
-		msm_id_status_w(&motg->id_status_work.work);
+		mod_delayed_work(motg->otg_wq, &motg->id_status_work,
+				msecs_to_jiffies(MSM_ID_STATUS_DELAY));
 	}
 
 	return IRQ_HANDLED;
@@ -1829,7 +1831,8 @@ skip_phy_resume:
 
 	if (motg->phy_irq_pending) {
 		motg->phy_irq_pending = false;
-		msm_id_status_w(&motg->id_status_work.work);
+		mod_delayed_work(motg->otg_wq, &motg->id_status_work,
+				msecs_to_jiffies(MSM_ID_STATUS_DELAY));
 	}
 
 	if (motg->host_bus_suspend) {
@@ -2346,25 +2349,26 @@ static bool msm_otg_read_pmic_id_state(struct msm_otg *motg)
 
 static bool msm_otg_read_phy_id_state(struct msm_otg *motg)
 {
+	struct device *dev = motg->phy.dev;
 	u8 val;
 
-	/*
-	 * clear the pending/outstanding interrupts and
-	 * read the ID status from the SRC_STATUS register.
-	 */
-	writeb_relaxed(USB_PHY_ID_MASK, USB2_PHY_USB_PHY_INTERRUPT_CLEAR1);
+	pm_runtime_get_sync(dev);
 
+	writeb_relaxed(USB_PHY_ID_MASK, USB2_PHY_USB_PHY_INTERRUPT_CLEAR1);
 	writeb_relaxed(0x1, USB2_PHY_USB_PHY_IRQ_CMD);
-	/*
-	 * Databook says 200 usec delay is required for
-	 * clearing the interrupts.
-	 */
 	udelay(200);
 	writeb_relaxed(0x0, USB2_PHY_USB_PHY_IRQ_CMD);
 
 	val = readb_relaxed(USB2_PHY_USB_PHY_INTERRUPT_SRC_STATUS);
+
+	pm_runtime_mark_last_busy(dev);
+	pm_runtime_put_autosuspend(dev);
+
+	if (val == 0xff)
+		return true;
+
 	if (val & USB_PHY_IDDIG_1_0)
-		return false; /* ID is grounded */
+		return false;
 	else
 		return true;
 }
@@ -2660,8 +2664,10 @@ static void msm_chg_detect_work(struct work_struct *w)
 				ulpi_write(phy, 0x2, 0x86);
 
 			motg->chg_state = USB_CHG_STATE_UNDEFINED;
+			motg->chg_detection = false;
 			if (motg->chg_type == USB_SDP_CHARGER ||
-			    motg->chg_type == USB_CDP_CHARGER)
+			    motg->chg_type == USB_CDP_CHARGER ||
+			    phy->otg->state != OTG_STATE_B_IDLE)
 				queue_sm_work = true;
 
 			motg->chg_type = USB_INVALID_CHARGER;
@@ -2671,7 +2677,7 @@ static void msm_chg_detect_work(struct work_struct *w)
 			pm_runtime_mark_last_busy(phy->dev);
 			pm_runtime_put_autosuspend(phy->dev);
 			if (queue_sm_work)
-				queue_work(motg->otg_wq, &motg->sm_work);
+				msm_otg_kick_sm_work(motg);
 			else
 				return;
 		}
@@ -2851,6 +2857,9 @@ static void msm_otg_sm_work(struct work_struct *w)
 			pr_debug("b_sess_vld\n");
 			msm_otg_dbg_log_event(phy, "B_SESS_VLD",
 					motg->inputs, otg->state);
+			if (motg->chg_detection &&
+			    motg->chg_state != USB_CHG_STATE_QUEUE_SM_WORK)
+				break;
 			if (!otg->gadget) {
 				msm_otg_dbg_log_event(phy,
 					"SM WORK: Gadget Not Set",
@@ -3267,12 +3276,10 @@ static void msm_id_status_w(struct work_struct *w)
 	}
 }
 
-#define MSM_ID_STATUS_DELAY	5 /* 5msec */
 static irqreturn_t msm_id_irq(int irq, void *data)
 {
 	struct msm_otg *motg = data;
 
-	/*schedule delayed work for 5msec for ID line state to settle*/
 	queue_delayed_work(motg->otg_wq, &motg->id_status_work,
 			msecs_to_jiffies(MSM_ID_STATUS_DELAY));
 
