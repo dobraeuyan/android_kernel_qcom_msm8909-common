@@ -13,6 +13,8 @@
  */
 #include "st480.h"
 #include <linux/sensors.h>
+#include <linux/mutex.h>
+#include <linux/pm.h>
 
 #define VENDOR_NAME			"SENODIA"
 #define MODULE_NAME		"ST480"
@@ -29,10 +31,14 @@ struct st480_data {
 	struct sensors_classdev cdev;
 	struct class *st480_class;
 	struct device *factory_device;
+	struct regulator *vdd;
+	struct regulator *vio;
+	struct mutex op_lock;
 	unsigned int poll_interval;
 	rwlock_t lock;
 	atomic_t m_flag;
 	atomic_t enable;
+	atomic_t suspended;
 };
 
 static struct sensors_classdev sensors_cdev = {
@@ -465,19 +471,32 @@ static void st480_work_func(void)
 
 static void st480_input_func(struct work_struct *work)
 {
-	struct st480_data *st480 = container_of((struct delayed_work *)work, struct st480_data, work);
+	struct st480_data *data = container_of((struct delayed_work *)work, struct st480_data, work);
+	unsigned int delay;
+
+	if (atomic_read(&data->suspended) || !atomic_read(&data->enable))
+		return;
 
 	SENODIAFUNC("st480_input_func");
 	st480_work_func();
 
-	if (atomic_read(&st480->m_flag) || atomic_read(&mv_flag) || atomic_read(&rm_flag) || atomic_read(&mrv_flag)) {
-		input_report_abs(st480->input_dev, ABS_X, mag.mag_x);
-		input_report_abs(st480->input_dev, ABS_Y, mag.mag_y);
-		input_report_abs(st480->input_dev, ABS_Z, mag.mag_z);
-		input_sync(st480->input_dev);
+	if (atomic_read(&data->m_flag) || atomic_read(&mv_flag) || atomic_read(&rm_flag) || atomic_read(&mrv_flag)) {
+		input_report_abs(data->input_dev, ABS_X, mag.mag_x);
+		input_report_abs(data->input_dev, ABS_Y, mag.mag_y);
+		input_report_abs(data->input_dev, ABS_Z, mag.mag_z);
+		input_sync(data->input_dev);
 	}
 
-	schedule_delayed_work(&st480->work, msecs_to_jiffies(st480->poll_interval));
+	if (atomic_read(&data->suspended) || !atomic_read(&data->enable))
+		return;
+
+	read_lock(&data->lock);
+	delay = data->poll_interval;
+	read_unlock(&data->lock);
+	if (delay < ST480_MIN_DELAY)
+		delay = ST480_MIN_DELAY;
+
+	schedule_delayed_work(&data->work, msecs_to_jiffies(delay));
 }
 
 static void ecs_closedone(void)
@@ -503,8 +522,6 @@ static int st480_open(struct inode *inode, struct file *file)
 		}
 	}
 
-	if (atomic_read(&reserve_open_flag))
-		schedule_delayed_work(&st480->work, msecs_to_jiffies(st480_delay));
 	return ret;
 }
 
@@ -518,7 +535,6 @@ static int st480_release(struct inode *inode, struct file *file)
 
 	ecs_closedone();
 
-	cancel_delayed_work(&st480->work);
 	return 0;
 }
 
@@ -655,32 +671,38 @@ static int auto_test_read(void *unused)
 }
 #endif
 
-static int st480_set_enable(struct st480_data *st480, bool on)
+static int st480_set_enable(struct st480_data *data, bool on)
 {
-	int retval = 0;
-	struct i2c_client *client = st480->client;
+	struct i2c_client *client = data->client;
+	unsigned int delay;
 
 	dev_info(&client->dev, "enable:%s\n", on ? "on" : "off");
 
+	mutex_lock(&data->op_lock);
 	if (on) {
-		schedule_delayed_work(&st480->work, msecs_to_jiffies(st480->poll_interval));
-		atomic_set(&st480->enable, 1);
+		atomic_set(&data->enable, 1);
+		if (!atomic_read(&data->suspended)) {
+			read_lock(&data->lock);
+			delay = data->poll_interval;
+			read_unlock(&data->lock);
+			schedule_delayed_work(&data->work, msecs_to_jiffies(delay));
+		}
 	} else {
-		cancel_delayed_work(&st480->work);
-		atomic_set(&st480->enable, 0);
+		atomic_set(&data->enable, 0);
+		cancel_delayed_work_sync(&data->work);
 	}
-	return retval;
+	mutex_unlock(&data->op_lock);
+	return 0;
 }
 
-static int st480_set_poll_delay(struct st480_data *st480, unsigned int msecs)
+static int st480_set_poll_delay(struct st480_data *data, unsigned int msecs)
 {
-	/* FIXME: must larger than ST480 minimun delay 28 ms, otherwise ecc error */
-	if (msecs <= 28)
-		msecs = 28;
+	if (msecs < ST480_MIN_DELAY)
+		msecs = ST480_MIN_DELAY;
 
-	write_lock(&st480->lock);
-	st480->poll_interval = msecs;
-	write_unlock(&st480->lock);
+	write_lock(&data->lock);
+	data->poll_interval = msecs;
+	write_unlock(&data->lock);
 
 	return 0;
 }
@@ -748,7 +770,7 @@ static ssize_t st480_selftest(struct device *dev,
 	pr_info("[SENSOR]: %s start\n", __func__);
 
 	if (atomic_read(&st480->enable) == 1)
-		cancel_delayed_work(&st480->work);
+		cancel_delayed_work_sync(&st480->work);
 
 	usleep_range(30000, 30100);
 
@@ -842,7 +864,7 @@ static ssize_t st480_selftest(struct device *dev,
 	else
 		pr_info("[SENSOR]: %s fail\n", __func__);
 
-	if (atomic_read(&st480->enable) == 1) {
+	if (atomic_read(&st480->enable) == 1 && !atomic_read(&st480->suspended)) {
 		schedule_delayed_work(&st480->work,
 				msecs_to_jiffies(st480->poll_interval));
 	}
@@ -862,6 +884,66 @@ static struct device_attribute *sensor_attrs[] = {
 	NULL,
 };
 
+static int st480_power_init(struct st480_data *data)
+{
+	struct device *dev = &data->client->dev;
+	int err;
+
+	data->vdd = regulator_get_optional(dev, "vdd");
+	if (IS_ERR(data->vdd)) {
+		err = PTR_ERR(data->vdd);
+		data->vdd = NULL;
+		if (err == -EPROBE_DEFER)
+			return err;
+	} else {
+		err = regulator_enable(data->vdd);
+		if (err) {
+			regulator_put(data->vdd);
+			data->vdd = NULL;
+			return err;
+		}
+	}
+
+	data->vio = regulator_get_optional(dev, "vio");
+	if (IS_ERR(data->vio)) {
+		err = PTR_ERR(data->vio);
+		data->vio = NULL;
+		if (err == -EPROBE_DEFER)
+			goto err_vdd;
+	} else {
+		err = regulator_enable(data->vio);
+		if (err) {
+			regulator_put(data->vio);
+			data->vio = NULL;
+			goto err_vdd;
+		}
+	}
+
+	return 0;
+
+err_vdd:
+	if (data->vdd) {
+		regulator_disable(data->vdd);
+		regulator_put(data->vdd);
+		data->vdd = NULL;
+	}
+	return err;
+}
+
+static void st480_power_deinit(struct st480_data *data)
+{
+	if (data->vio) {
+		regulator_disable(data->vio);
+		regulator_put(data->vio);
+		data->vio = NULL;
+	}
+	if (data->vdd) {
+		regulator_disable(data->vdd);
+		regulator_put(data->vdd);
+		data->vdd = NULL;
+	}
+}
+
 static int st480_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	int err = 0;
@@ -877,7 +959,6 @@ static int st480_probe(struct i2c_client *client, const struct i2c_device_id *id
 		goto exit0;
 	}
 
-	/* Allocate memory for driver data */
 	st480 = kzalloc(sizeof(struct st480_data), GFP_KERNEL);
 	if (!st480) {
 		printk(KERN_ERR "SENODIA st480_probe: memory allocation failed.\n");
@@ -890,12 +971,24 @@ static int st480_probe(struct i2c_client *client, const struct i2c_device_id *id
 	i2c_set_clientdata(client, st480);
 
 	client->addr = 0x0c;
-	
+
+	mutex_init(&st480->op_lock);
+	rwlock_init(&st480->lock);
+	atomic_set(&st480->enable, 0);
+	atomic_set(&st480->suspended, 0);
+
+	err = st480_power_init(st480);
+	if (err) {
+		dev_err(&client->dev, "st480 power init error:%d\n", err);
+		goto exit2;
+	}
+
 	INIT_DELAYED_WORK(&st480->work, st480_input_func);
 
 	if (st480_setup(st480->client) != 0) {
 		dev_err(&client->dev, "st480 setup error!\n");
-		goto exit2;
+		err = -EIO;
+		goto exit_power;
 	}
 
 	/* Declare input device */
@@ -932,8 +1025,6 @@ static int st480_probe(struct i2c_client *client, const struct i2c_device_id *id
 		goto exit5;
 	}
 
-	rwlock_init(&st480->lock);
-	/* As default, report all information */
 	atomic_set(&st480->m_flag, 1);
 	atomic_set(&mv_flag, 1);
 	atomic_set(&rm_flag, 1);
@@ -977,11 +1068,15 @@ exit6:
 	misc_deregister(&st480_device);
 exit5:
 	input_unregister_device(st480->input_dev);
+	goto exit_power;
 exit4:
 	input_free_device(st480->input_dev);
 exit3:
+exit_power:
+	st480_power_deinit(st480);
 exit2:
 	kfree(st480);
+	st480 = NULL;
 exit1:
 exit0:
 	return err;
@@ -990,20 +1085,53 @@ exit0:
 
 static int st480_remove(struct i2c_client *client)
 {
-	struct st480_data *st480 = i2c_get_clientdata(client);
+	struct st480_data *data = i2c_get_clientdata(client);
 
-	sensors_classdev_unregister(&st480->cdev);
-	atomic_set(&st480->m_flag, 0);
+	sensors_classdev_unregister(&data->cdev);
+	atomic_set(&data->enable, 0);
+	atomic_set(&data->m_flag, 0);
+	cancel_delayed_work_sync(&data->work);
 	misc_deregister(&st480_device);
-	input_unregister_device(st480->input_dev);
-	input_free_device(st480->input_dev);
-	cancel_delayed_work(&st480->work);
+	input_unregister_device(data->input_dev);
 	i2c_set_clientdata(client, NULL);
-	class_destroy(st480->st480_class);
-	sensors_unregister(st480->factory_device, sensor_attrs);
-	kfree(st480);
+	class_destroy(data->st480_class);
+	st480_power_deinit(data);
+	kfree(data);
+	st480 = NULL;
 	return 0;
 }
+
+static int st480_suspend(struct device *dev)
+{
+	struct st480_data *data = dev_get_drvdata(dev);
+
+	mutex_lock(&data->op_lock);
+	atomic_set(&data->suspended, 1);
+	cancel_delayed_work_sync(&data->work);
+	mutex_unlock(&data->op_lock);
+
+	return 0;
+}
+
+static int st480_resume(struct device *dev)
+{
+	struct st480_data *data = dev_get_drvdata(dev);
+	unsigned int delay;
+
+	mutex_lock(&data->op_lock);
+	atomic_set(&data->suspended, 0);
+	if (atomic_read(&data->enable)) {
+		read_lock(&data->lock);
+		delay = data->poll_interval;
+		read_unlock(&data->lock);
+		schedule_delayed_work(&data->work, msecs_to_jiffies(delay));
+	}
+	mutex_unlock(&data->op_lock);
+
+	return 0;
+}
+
+static SIMPLE_DEV_PM_OPS(st480_pm_ops, st480_suspend, st480_resume);
 
 static const struct i2c_device_id st480_id_table[] = {
 	{ ST480_I2C_NAME, 0 },
@@ -1023,6 +1151,7 @@ static struct i2c_driver st480_driver = {
 		.name = ST480_I2C_NAME,
 		.owner = THIS_MODULE,
 		.of_match_table = st480_match_table,
+		.pm = &st480_pm_ops,
 	},
 };
 

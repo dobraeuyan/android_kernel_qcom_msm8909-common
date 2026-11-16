@@ -3,6 +3,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/i2c.h>
 #include <linux/leds.h>
 #include <linux/slab.h>
@@ -76,6 +77,7 @@ static u8 sn3191_ua_to_cs(u32 ua)
  * programmed to index 0 = 0s here, matching the factory preset -- see
  * sn3191_blink_set() -- so it needs no table. */
 static const int t_rise_fall_ms[] = { 130, 260, 520, 1040, 2080, 4160, 8320, 16640 };
+static const int t_hold_ms[]      = { 0, 130, 260, 520, 1040, 2080, 4160, 8320, 16640 };
 static const int t_off_ms[]       = { 0, 130, 260, 520, 1040, 2080, 4160, 8320, 16640, 33280, 66560 };
 
 /* Find index that provides a time >= requested time (Ceiling) */
@@ -87,6 +89,16 @@ static int find_nearest_index(const int *table, int size, int ms)
 			return i;
 	}
 	return size - 1;
+}
+
+static int find_floor_index(const int *table, int size, int ms)
+{
+	int i;
+	for (i = size - 1; i > 0; i--) {
+		if (table[i] <= ms)
+			return i;
+	}
+	return 0;
 }
 
 static int sn3191_write_reg(struct sn3191_led_data *led, u8 reg, u8 val)
@@ -121,86 +133,127 @@ static int sn3191_set_brightness(struct led_classdev *cdev,
 	return ret < 0 ? ret : 0;
 }
 
-static int sn3191_blink_set(struct led_classdev *cdev,
-			    unsigned long *delay_on,
-			    unsigned long *delay_off)
+static int sn3191_blink_set_locked(struct sn3191_led_data *led,
+				   unsigned long *delay_on,
+				   unsigned long *delay_off,
+				   u8 pwm)
 {
-	struct sn3191_led_data *led = container_of(cdev, struct sn3191_led_data, cdev);
 	int t1_idx, t2_idx, t3_idx, t4_idx;
 	u8 t1_t2_val, t3_t4_val;
 
-	/* Default behavior for Android [cite: 121] */
 	if (!*delay_on && !*delay_off) {
 		*delay_on = 1000;
 		*delay_off = 1000;
 	}
 
-	mutex_lock(&led->lock);
+	if (!pwm)
+		pwm = 255;
 
-	/* 1. Reset Mode to PWM first to STOP any running breath cycle */
 	sn3191_write_reg(led, SN3191_REG_LED_MODE, SN3191_MODE_PWM);
 
-	/* Breathing shape (datasheet Figure 6: full cycle = T0 T1 T2 T3 T4, then
-	 * repeats from T1 while LED Mode = One Shot):
-	 *   T4 (Off)                         = delay_off
-	 *   T1 (Rise) + T2 (Hold) + T3 (Fall) = delay_on
-	 *
-	 * Split delay_on 50% Rise / 0% Hold / 50% Fall. This is NOT arbitrary: it
-	 * reproduces the factory effect. The original Lenovo driver
-	 * (youneedthis/bamboo/abraham-redwood-original-lenovo-source/kernel/
-	 *  drivers/leds/leds-sn3191.c) drives its only breathing preset as
-	 *   led_effect_flash = { T0 0.26s, T1 1.04s, T2 0s, T3 1.04s, T4 1.04s }
-	 * i.e. a symmetric rise/fall with NO hold at peak, and that is what the
-	 * stock lights HAL triggers through /sys/class/leds/red/blink. With this
-	 * split the AOSP default notification cadence lands exactly on it:
-	 * delay_on/off = 1000/1000 -> T1 = T3 = ceil(500ms) = 1.04s, T2 = 0,
-	 * T4 = ceil(1000ms) = 1.04s. A hold step (the previous 40/20/40 split)
-	 * inserted a flat plateau the factory LED never had.
-	 */
 	t4_idx = find_nearest_index(t_off_ms, ARRAY_SIZE(t_off_ms), *delay_off);
-	t1_idx = find_nearest_index(t_rise_fall_ms, ARRAY_SIZE(t_rise_fall_ms), *delay_on / 2);
-	t3_idx = t1_idx; /* Symmetric */
-	t2_idx = 0; /* no hold at peak, as in the factory preset */
+	t1_idx = find_floor_index(t_rise_fall_ms, ARRAY_SIZE(t_rise_fall_ms), *delay_on / 3);
+	t3_idx = t1_idx;
+	if (*delay_on > (unsigned long)(2 * t_rise_fall_ms[t1_idx]))
+		t2_idx = find_nearest_index(t_hold_ms, ARRAY_SIZE(t_hold_ms),
+					    *delay_on - 2 * t_rise_fall_ms[t1_idx]);
+	else
+		t2_idx = 0;
 
-	/* Construct Register Values [cite: 288, 300] */
-	t1_t2_val = (t1_idx << 5) | (t2_idx << 1); /* T1=D7:D5, T2=D4:D1 */
-	t3_t4_val = (t3_idx << 5) | (t4_idx << 1); /* T3=D7:D5, T4=D4:D1 */
+	t1_t2_val = (t1_idx << 5) | (t2_idx << 1);
+	t3_t4_val = (t3_idx << 5) | (t4_idx << 1);
 
-	/* 2. Configure Hardware */
-	sn3191_write_reg(led, SN3191_REG_SHUTDOWN, SN3191_CMD_ENABLE); /* Wake up */
-	/* 01h Breathing Control (Table 4): D5 = RM (Ramping Mode), D4 = HT (Hold
-	 * Time select). 0x00 keeps RM=0, which is the FULLY AUTOMATIC breathing
-	 * the notification LED wants: the T1..T4 cycle repeats forever. Do NOT
-	 * "enable ramping" by setting RM=1 -- per the datasheet's Semiautomatic
-	 * Breathing section that is the ONE-SHOT variant, where the LED completes a
-	 * single cycle and then holds (on T2 if HT=0, off on T4 if HT=1), i.e. it
-	 * stops blinking. The stock Lenovo driver never writes 01h at all, leaving
-	 * it at this same 0x00 default. HT is a don't-care while T2 = 0s. */
+	sn3191_write_reg(led, SN3191_REG_SHUTDOWN, SN3191_CMD_ENABLE);
 	sn3191_write_reg(led, SN3191_REG_BREATH_CTRL, 0x00);
-	sn3191_write_reg(led, SN3191_REG_T0, 0x00); /* No start delay [cite: 282] */
+	sn3191_write_reg(led, SN3191_REG_T0, 0x00);
 	sn3191_write_reg(led, SN3191_REG_T1_T2, t1_t2_val);
 	sn3191_write_reg(led, SN3191_REG_T3_T4, t3_t4_val);
-	sn3191_write_reg(led, SN3191_REG_TIME_UPDATE, 0x00); /* Update Timers [cite: 293] */
-	
-	/* 3. Set Current (breathing peak = IMAX) and Enable OUT */
+	sn3191_write_reg(led, SN3191_REG_TIME_UPDATE, 0x00);
+
 	sn3191_write_reg(led, SN3191_REG_CURRENT, led->cur_reg);
-	sn3191_write_reg(led, SN3191_REG_LED_CTRL, 0x01); /* OUT Enable */
+	sn3191_write_reg(led, SN3191_REG_LED_CTRL, 0x01);
 
-	/* 4. Load full-scale PWM and latch it before breathing. The stock Lenovo
-	 * driver does this unconditionally: although the datasheet calls the PWM
-	 * register "unavailable" in One Shot mode, the chip still gates the breath
-	 * through the PWM latch, so a stale/zero PWM (0x00 after reset, before any
-	 * solid-brightness write) would make the breath invisible. */
-	sn3191_write_reg(led, SN3191_REG_PWM, 0xff);
-	sn3191_write_reg(led, SN3191_REG_PWM_UPDATE, 0x00); /* Latch (07h) */
+	sn3191_write_reg(led, SN3191_REG_PWM, pwm);
+	sn3191_write_reg(led, SN3191_REG_PWM_UPDATE, 0x00);
 
-	/* 5. Trigger Start (switch to One Shot / breath mode) */
 	sn3191_write_reg(led, SN3191_REG_LED_MODE, SN3191_MODE_BREATH);
-
-	mutex_unlock(&led->lock);
 
 	return 0;
 }
+
+static int sn3191_blink_set(struct led_classdev *cdev,
+			    unsigned long *delay_on,
+			    unsigned long *delay_off)
+{
+	struct sn3191_led_data *led = container_of(cdev, struct sn3191_led_data, cdev);
+	int ret;
+
+	mutex_lock(&led->lock);
+	ret = sn3191_blink_set_locked(led, delay_on, delay_off, 255);
+	mutex_unlock(&led->lock);
+
+	return ret;
+}
+
+static ssize_t sn3191_blink_store(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	struct led_classdev *cdev = dev_get_drvdata(dev);
+	struct sn3191_led_data *led = container_of(cdev, struct sn3191_led_data, cdev);
+	unsigned long delay_on = 0, delay_off = 0;
+	unsigned int pwm = 255;
+	int parsed;
+
+	parsed = sscanf(buf, "%lu %lu %u", &delay_on, &delay_off, &pwm);
+	if (parsed >= 2) {
+		if (delay_on == 0 || delay_off == 0) {
+			sn3191_set_brightness(cdev, LED_OFF);
+			return count;
+		}
+		if (pwm == 0)
+			pwm = 1;
+		else if (pwm > 255)
+			pwm = 255;
+
+		mutex_lock(&led->lock);
+		sn3191_blink_set_locked(led, &delay_on, &delay_off, (u8)pwm);
+		mutex_unlock(&led->lock);
+		return count;
+	}
+
+	if (parsed == 1 && delay_on > 0) {
+		delay_on = 1000;
+		delay_off = 1000;
+		mutex_lock(&led->lock);
+		sn3191_blink_set_locked(led, &delay_on, &delay_off, 255);
+		mutex_unlock(&led->lock);
+		return count;
+	}
+
+	if (parsed == 1 && delay_on == 0) {
+		sn3191_set_brightness(cdev, LED_OFF);
+		return count;
+	}
+
+	return -EINVAL;
+}
+
+static DEVICE_ATTR(blink, 0664, NULL, sn3191_blink_store);
+
+static struct attribute *sn3191_attrs[] = {
+	&dev_attr_blink.attr,
+	NULL,
+};
+
+static const struct attribute_group sn3191_attr_group = {
+	.attrs = sn3191_attrs,
+};
+
+static const struct attribute_group *sn3191_attr_groups[] = {
+	&sn3191_attr_group,
+	NULL,
+};
 
 static int sn3191_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
@@ -252,13 +305,28 @@ static int sn3191_probe(struct i2c_client *client, const struct i2c_device_id *i
 	else
 		led->cdev.name = led_name;
 
+	of_property_read_string(np, "linux,default-trigger",
+				&led->cdev.default_trigger);
+
 	/* i2c can sleep -> blocking variant (brightness_set must not sleep). */
 	led->cdev.brightness_set_blocking = sn3191_set_brightness;
 	led->cdev.blink_set = sn3191_blink_set;
 	led->cdev.max_brightness = 255;
+	led->cdev.groups = sn3191_attr_groups;
 
 	ret = led_classdev_register(&client->dev, &led->cdev);
 	if (ret < 0) return ret;
+
+	if (of_property_read_bool(np, "si-en,boot-blink") &&
+	    (!saved_command_line ||
+	     !strstr(saved_command_line, "androidboot.mode=charger"))) {
+		unsigned long delay_on = 1000;
+		unsigned long delay_off = 1000;
+
+		mutex_lock(&led->lock);
+		sn3191_blink_set_locked(led, &delay_on, &delay_off, 255);
+		mutex_unlock(&led->lock);
+	}
 
 	dev_info(&client->dev, "IS31FL3191 (Bamboo) probed.\n");
 	return 0;

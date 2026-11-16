@@ -153,6 +153,9 @@
 			regulator-name = "ncp6924_dcdc2";
 			regulator-min-microvolt = <600000>;
 			regulator-max-microvolt = <3300000>;
+			regulator-boot-on;
+			regulator-always-on;
+			ldo-always-on;
 			ncp,resource-id = <2>;
 			ncp,regulator-type = <0>;
 			ncp,enable-addr = <0x14>;

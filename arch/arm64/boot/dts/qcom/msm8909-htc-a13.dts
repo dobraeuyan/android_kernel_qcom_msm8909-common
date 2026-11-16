@@ -269,7 +269,7 @@
 		qcom,cool-bat-ma = <1300>;
 		qcom,warm-bat-ma = <1300>;
 		qcom,cool-bat-mv = <4350>;
-		qcom,warm-bat-mv = <4000>;
+		qcom,warm-bat-mv = <4100>;
 		regulator-name = "smb358_otg_vreg";
 	};
 };

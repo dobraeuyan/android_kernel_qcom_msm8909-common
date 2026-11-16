@@ -315,6 +315,7 @@ struct kionix_accel_driver {
 
 	bool accel_drdy;
 	bool accel_delay_change;
+	bool suspended_enable;
 	int  accel_wkp_flag;
 
 	/* Function callback */
@@ -2802,27 +2803,43 @@ static int kionix_accel_remove(struct i2c_client *client)
 }
 
 #ifdef CONFIG_PM_SLEEP
-/*
- * 4.9's struct i2c_driver dropped the legacy .suspend/.resume callbacks; PM
- * now goes through .driver.pm (dev_pm_ops).  Same behaviour as the 3.10
- * original — just disable/enable the sensor across system suspend.
- */
 static int kionix_accel_suspend(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct kionix_accel_driver *acceld = i2c_get_clientdata(client);
 
-	kionix_accel_cdev_enable(&acceld->cdev, 0);
+	acceld->suspended_enable = atomic_read(&acceld->accel_enabled) > 0;
+	if (!acceld->suspended_enable)
+		return 0;
 
-	return 0;
+	if (acceld->accel_drdy == 0)
+		hrtimer_cancel(&acceld->timer_acc);
+
+	return acceld->kionix_accel_standby(acceld);
 }
 
 static int kionix_accel_resume(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct kionix_accel_driver *acceld = i2c_get_clientdata(client);
+	ktime_t ktime;
+	int err;
 
-	kionix_accel_cdev_enable(&acceld->cdev, 1);
+	if (!acceld->suspended_enable)
+		return 0;
+
+	acceld->suspended_enable = false;
+	err = acceld->kionix_accel_operate(acceld);
+	if (err < 0)
+		return err;
+
+	acceld->kionix_accel_update_odr(acceld,
+					atomic_read(&acceld->delay) / 2);
+	if (acceld->accel_drdy == 0) {
+		ktime = ktime_set(0,
+				  atomic_read(&acceld->delay) * NSEC_PER_MSEC);
+		hrtimer_start(&acceld->timer_acc, ktime, HRTIMER_MODE_REL);
+	}
 
 	return 0;
 }

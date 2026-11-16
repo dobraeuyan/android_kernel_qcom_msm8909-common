@@ -38,6 +38,7 @@
 #include <linux/fs.h>
 #include <linux/sched.h>
 #include <linux/err.h>
+#include <linux/regulator/consumer.h>
 
 /*
  * ABS(min~max)
@@ -123,7 +124,8 @@
  * Miscellaneous set.
  */
 #define MAX_FAILURE_COUNT 3
-#define ST480_DEFAULT_DELAY   28
+#define ST480_MIN_DELAY       35
+#define ST480_DEFAULT_DELAY   100
 #define ST480_AUTO_TEST 0
 #define OLD_KERNEL_VERSION 0
 

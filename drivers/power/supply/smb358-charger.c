@@ -2093,6 +2093,8 @@ static void smb_chg_adc_notification(enum qpnp_tm_state state, void *ctx)
 				chip->warm_bat_decidegc - HYSTERESIS_DECIDEGC;
 			chip->adc_param.high_temp =
 				chip->hot_bat_decidegc;
+			chip->adc_param.state_request =
+				ADC_TM_HIGH_LOW_THR_ENABLE;
 		} else if (temp >=
 			chip->cool_bat_decidegc && chip->jeita_supported) {
 			bat_hot = false;
@@ -2105,6 +2107,8 @@ static void smb_chg_adc_notification(enum qpnp_tm_state state, void *ctx)
 				chip->cool_bat_decidegc - HYSTERESIS_DECIDEGC;
 			chip->adc_param.high_temp =
 				chip->warm_bat_decidegc;
+			chip->adc_param.state_request =
+				ADC_TM_HIGH_LOW_THR_ENABLE;
 		} else if (temp >=
 			chip->cold_bat_decidegc) {
 			bat_hot = false;
@@ -2228,6 +2232,54 @@ static void smb_chg_adc_notification(enum qpnp_tm_state state, void *ctx)
 
 	if (qpnp_adc_tm_channel_measure(chip->adc_tm_dev, &chip->adc_param))
 		pr_err("request ADC error\n");
+}
+
+static void smb358_jeita_self_heal(struct smb358_charger *chip)
+{
+	struct qpnp_adc_tm_chip *adc_tm;
+	int temp;
+
+	if (!chip->jeita_supported || !chip->using_pmic_therm)
+		return;
+
+	if (!chip->batt_warm && !chip->batt_cool)
+		return;
+
+	temp = smb358_get_batt_therm_decidegc(chip);
+
+	if (chip->batt_warm &&
+	    temp < (chip->warm_bat_decidegc - HYSTERESIS_DECIDEGC)) {
+		chip->batt_warm = false;
+		smb358_chg_set_appropriate_battery_current(chip);
+		smb358_chg_set_appropriate_vddmax(chip);
+
+		adc_tm = smb358_get_adc_tm(chip);
+		if (!IS_ERR_OR_NULL(adc_tm)) {
+			chip->adc_param.low_temp =
+				chip->cool_bat_decidegc - HYSTERESIS_DECIDEGC;
+			chip->adc_param.high_temp =
+				chip->warm_bat_decidegc;
+			chip->adc_param.state_request =
+				ADC_TM_HIGH_LOW_THR_ENABLE;
+			qpnp_adc_tm_channel_measure(adc_tm, &chip->adc_param);
+		}
+	} else if (chip->batt_cool &&
+		   temp > (chip->cool_bat_decidegc + HYSTERESIS_DECIDEGC)) {
+		chip->batt_cool = false;
+		smb358_chg_set_appropriate_battery_current(chip);
+		smb358_chg_set_appropriate_vddmax(chip);
+
+		adc_tm = smb358_get_adc_tm(chip);
+		if (!IS_ERR_OR_NULL(adc_tm)) {
+			chip->adc_param.low_temp =
+				chip->cool_bat_decidegc - HYSTERESIS_DECIDEGC;
+			chip->adc_param.high_temp =
+				chip->warm_bat_decidegc;
+			chip->adc_param.state_request =
+				ADC_TM_HIGH_LOW_THR_ENABLE;
+			qpnp_adc_tm_channel_measure(adc_tm, &chip->adc_param);
+		}
+	}
 }
 
 /*
@@ -2477,6 +2529,7 @@ static void smb358_external_power_changed(struct power_supply *psy)
 
 	smb358_enable_volatile_writes(chip);
 	smb358_set_usb_chg_current(chip, current_limit);
+	smb358_jeita_self_heal(chip);
 }
 
 static int smb_parse_dt(struct smb358_charger *chip)

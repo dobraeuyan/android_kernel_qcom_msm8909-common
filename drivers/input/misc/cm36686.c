@@ -3147,7 +3147,7 @@ MODULE_DEVICE_TABLE(i2c, cm36686_i2c_id);
 
 static struct of_device_id cm36686_match_table[] = {
 	{.compatible = "capella,cm36686"},
-	{.compatible = "CM36686"},	/* stock HTC compat, kept as fallback */
+	{.compatible = "CM36686"},
 	{},
 };
 
@@ -3156,13 +3156,13 @@ static struct i2c_driver cm36686_driver = {
 		.name = "CM36686",
 		.owner = THIS_MODULE,
 		.pm = &cm36686_pm_ops,
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 #ifdef CONFIG_OF
 		.of_match_table = cm36686_match_table,
 #endif
 	},
 	.probe = cm36686_probe,
 	.id_table = cm36686_i2c_id,
-
 };
 module_i2c_driver(cm36686_driver);
 #ifndef CONFIG_OF
