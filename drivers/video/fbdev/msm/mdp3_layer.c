@@ -262,7 +262,8 @@ int mdp3_layer_pre_commit(struct msm_fb_data_type *mfd,
 	struct mdp3_session_data *mdp3_session;
 	struct mdp3_dma *dma;
 	int layer_count = commit->input_layer_cnt;
-	int stride, format, client;
+	int stride, format, pack_pattern, client;
+	bool pattern_changed = false;
 
 	/* Handle NULL commit */
 	if (!layer_count) {
@@ -283,27 +284,23 @@ int mdp3_layer_pre_commit(struct msm_fb_data_type *mfd,
 
 	stride = layer->buffer.width * ppp_bpp(layer->buffer.format);
 	format = mdp3_ctrl_get_source_format(layer->buffer.format);
+	pack_pattern = mdp3_ctrl_get_pack_pattern(layer->buffer.format);
 	pr_debug("stride:%d layer_width:%d", stride, layer->buffer.width);
 
-	/*
-	 * mdp3 has no UBWC (or any other format it cannot decode); the client
-	 * (SDM/HWC) may hand us a format that maps to IBUF_FORMAT_UNDEFINED
-	 * (e.g. MDP_RGBA_8888_UBWC on the bootanim -> launcher handoff).  Do not
-	 * reprogram the DMA_P to an undefined format + 0 stride: that makes the
-	 * free-running video DSI scan the buffer with a bogus fetch config and
-	 * fill the whole panel for one frame (the green flash at bootanim end).
-	 * Keep the previous valid format and let the next commit correct it.
-	 */
 	if (format != MDP3_DMA_IBUF_FORMAT_UNDEFINED) {
 		if ((dma->source_config.format != format) ||
-				(dma->source_config.stride != stride)) {
+				(dma->source_config.stride != stride) ||
+				(dma->output_config.pack_pattern != pack_pattern)) {
+			pattern_changed =
+				(dma->output_config.pack_pattern != pack_pattern);
 			dma->source_config.format = format;
 			dma->source_config.stride = stride;
-			dma->output_config.pack_pattern =
-				mdp3_ctrl_get_pack_pattern(layer->buffer.format);
+			dma->output_config.pack_pattern = pack_pattern;
 			dma->update_src_cfg = true;
 		}
 	}
+	if (pattern_changed)
+		mdp3_ctrl_csc_refresh(mdp3_session);
 	mdp3_session->overlay.id = 1;
 
 	ret = __mdp3_handle_buffer_fences(mfd, commit, layer_list);

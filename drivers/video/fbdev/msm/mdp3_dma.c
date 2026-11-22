@@ -431,6 +431,8 @@ static void mdp3_dmas_config_source(struct mdp3_dma *dma)
 	dma_s_cfg_reg = MDP3_REG_READ(MDP3_REG_DMA_S_CONFIG);
 	dma_s_cfg_reg &= ~MDP3_DMA_IBUF_FORMAT_MASK;
 	dma_s_cfg_reg |= source_config->format << 25;
+	dma_s_cfg_reg &= ~MDP3_DMA_PACK_PATTERN_MASK;
+	dma_s_cfg_reg |= dma->output_config.pack_pattern << 8;
 
 	dma_s_size = source_config->width | (source_config->height << 16);
 

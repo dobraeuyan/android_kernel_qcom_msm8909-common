@@ -2901,7 +2901,7 @@ static inline bool check_full_flush(size_t size, int op)
 	/* If we exceed the breakeven point, flush the entire cache */
 	bool ret = (kgsl_driver.full_cache_threshold != 0) &&
 		(size >= kgsl_driver.full_cache_threshold) &&
-		(op == KGSL_GPUMEM_CACHE_FLUSH);
+		((op & ~KGSL_GPUMEM_CACHE_RANGE) == KGSL_GPUMEM_CACHE_FLUSH);
 	if (ret)
 		flush_cache_all();
 	return ret;
@@ -3050,10 +3050,13 @@ long kgsl_ioctl_gpuobj_sync(struct kgsl_device_private *dev_priv,
 		if (entries[i] == NULL)
 			continue;
 
-		if (!(objs[i].op & KGSL_GPUMEM_CACHE_RANGE))
+		if (!(objs[i].op & KGSL_GPUMEM_CACHE_RANGE)) {
 			size += entries[i]->memdesc.size;
-		else if (objs[i].offset < entries[i]->memdesc.size)
-			size += (entries[i]->memdesc.size - objs[i].offset);
+		} else if (objs[i].offset < entries[i]->memdesc.size) {
+			uint64_t avail = entries[i]->memdesc.size -
+				objs[i].offset;
+			size += min_t(uint64_t, objs[i].length, avail);
+		}
 
 		full_flush = check_full_flush(size, objs[i].op);
 		if (full_flush) {

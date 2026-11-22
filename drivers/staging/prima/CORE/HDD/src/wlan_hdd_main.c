@@ -97,6 +97,8 @@
 #include "wlan_hdd_cfg80211.h"
 #include "wlan_hdd_p2p.h"
 #include <linux/rtnetlink.h>
+#include <linux/crc32.h>
+#include <linux/of.h>
 int wlan_hdd_ftm_start(hdd_context_t *pAdapter);
 #include "sapApi.h"
 #include <linux/semaphore.h>
@@ -13450,17 +13452,32 @@ static int hdd_generate_iface_mac_addr_auto(hdd_context_t *pHddCtx,
 
    if (0 != serialno)
    {
-      serialno &= 0x00FFFFFF;
-      serialno *= VOS_MAX_CONCURRENCY_PERSONA;
+      __le32 serial_le = cpu_to_le32(serialno);
+      u32 hash = crc32_le(~0U, (const u8 *)&serial_le, sizeof(serial_le)) ^ ~0U;
+
+      if (idx == 0 && pHddCtx->parent_dev && pHddCtx->parent_dev->of_node)
+      {
+         u8 oui[3];
+         if (of_property_read_u8_array(pHddCtx->parent_dev->of_node,
+                                       "qcom,wlan-mac-oui", oui, 3) == 0)
+         {
+            mac_addr.bytes[0] = oui[0];
+            mac_addr.bytes[1] = oui[1];
+            mac_addr.bytes[2] = oui[2];
+         }
+      }
+
+      hash &= 0x003FFFFFU;
+      hash *= VOS_MAX_CONCURRENCY_PERSONA;
 
       for (i = idx; i < VOS_MAX_CONCURRENCY_PERSONA; i++)
       {
          pHddCtx->cfg_ini->intfMacAddr[i] = mac_addr;
          pHddCtx->cfg_ini->intfMacAddr[i].bytes[3] =
-                                         (serialno >> 16) & 0xFF;
+                                         (hash >> 16) & 0xFF;
          pHddCtx->cfg_ini->intfMacAddr[i].bytes[4] =
-                                          (serialno >> 8) & 0xFF;
-         pHddCtx->cfg_ini->intfMacAddr[i].bytes[5] = serialno & 0xFF;
+                                          (hash >> 8) & 0xFF;
+         pHddCtx->cfg_ini->intfMacAddr[i].bytes[5] = hash & 0xFF;
 
          if (0 == memcmp(&pHddCtx->cfg_ini->intfMacAddr[i].bytes[0],
                          &mac_addr.bytes[0], VOS_MAC_ADDR_SIZE))
@@ -13469,7 +13486,7 @@ static int hdd_generate_iface_mac_addr_auto(hdd_context_t *pHddCtx,
                                             VOS_MAX_CONCURRENCY_PERSONA;
          }
 
-         serialno++;
+         hash++;
          hddLog(VOS_TRACE_LEVEL_ERROR,
                 "%s: Derived Mac Addr: " MAC_ADDRESS_STR, __func__,
                 MAC_ADDR_ARRAY(pHddCtx->cfg_ini->intfMacAddr[i].bytes));

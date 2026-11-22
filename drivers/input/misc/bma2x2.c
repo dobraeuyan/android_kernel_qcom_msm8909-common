@@ -5827,7 +5827,6 @@ static int bma2x2_set_enable(struct device *dev, int enable)
 		dev_err(dev, "can not enable or disable when calibration\n");
 		return -EBUSY;
 	}
-	printk("enter enable >>>>>> %d\n",enable);
 	mutex_lock(&bma2x2->enable_mutex);
 	if (enable && !pre_enable) {
 		if (!en_sig_motion) {
@@ -5961,7 +5960,6 @@ static ssize_t bma2x2_enable_store(struct device *dev,
 		if (error)
 			return -EBUSY;
 	}
-	printk(">>>>>>test enable <<<<< = %ld \n", data);
 
 	return count;
 }
@@ -9045,14 +9043,14 @@ static int bma2x2_store_state(struct i2c_client *client,
 }
 
 #ifdef CONFIG_PM
-/* 4.9: i2c_driver lost legacy .suspend/.resume; use dev_pm_ops (struct device * signature) */
 static int bma2x2_suspend(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct bma2x2_data *data = i2c_get_clientdata(client);
 
 	data->suspend_state.powerEn = bma2x2_is_power_enabled(data);
-	bma2x2_set_enable(&client->dev, 0);
+	if (data->suspend_state.powerEn)
+		bma2x2_set_enable(&client->dev, 0);
 	return 0;
 }
 

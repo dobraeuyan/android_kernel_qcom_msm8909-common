@@ -48,7 +48,8 @@ static int mdp3_ctrl_lut_read(struct msm_fb_data_type *mfd,
 static int mdp3_ctrl_lut_config(struct msm_fb_data_type *mfd,
 				struct mdp_rgb_lut_data *cfg);
 static void mdp3_ctrl_pp_resume(struct msm_fb_data_type *mfd);
-static int mdp3_csc_apply(struct mdp3_session_data *mdp3_session, bool nested);
+static int mdp3_csc_apply(struct mdp3_session_data *mdp3_session,
+				bool nested, bool defer);
 
 u32 mdp_lut_inverse16[MDP_LUT_SIZE] = {
 0, 65536, 32768, 21845, 16384, 13107, 10923, 9362, 8192, 7282, 6554, 5958,
@@ -760,9 +761,11 @@ int mdp3_ctrl_get_source_format(u32 imgType)
 
 	switch (imgType) {
 	case MDP_RGB_565:
+	case MDP_BGR_565:
 		format = MDP3_DMA_IBUF_FORMAT_RGB565;
 		break;
 	case MDP_RGB_888:
+	case MDP_BGR_888:
 		format = MDP3_DMA_IBUF_FORMAT_RGB888;
 		break;
 	case MDP_XRGB_8888:
@@ -770,6 +773,7 @@ int mdp3_ctrl_get_source_format(u32 imgType)
 	case MDP_RGBA_8888:
 	case MDP_BGRA_8888:
 	case MDP_RGBX_8888:
+	case MDP_BGRX_8888:
 		format = MDP3_DMA_IBUF_FORMAT_XRGB8888;
 		break;
 	default:
@@ -782,7 +786,8 @@ int mdp3_ctrl_get_pack_pattern(u32 imgType)
 {
 	int packPattern = MDP3_DMA_OUTPUT_PACK_PATTERN_RGB;
 
-	if (imgType == MDP_RGBA_8888 || imgType == MDP_RGB_888)
+	if (imgType == MDP_RGBA_8888 || imgType == MDP_RGBX_8888 ||
+	    imgType == MDP_RGB_888 || imgType == MDP_BGR_565)
 		packPattern = MDP3_DMA_OUTPUT_PACK_PATTERN_BGR;
 	return packPattern;
 }
@@ -1037,7 +1042,7 @@ static int mdp3_ctrl_on(struct msm_fb_data_type *mfd)
 			mdp3_session->status, mdp3_session->intf->active,
 			mdp3_session->in_splash_screen);
 		mdp3_session->boot_wp_applied = true;
-		mdp3_csc_apply(mdp3_session, true);
+		mdp3_csc_apply(mdp3_session, true, false);
 		mdp3_apply_default_gamma(mfd->panel_info);
 	}
 
@@ -1059,8 +1064,7 @@ static int mdp3_ctrl_on(struct msm_fb_data_type *mfd)
 		 * probe, and mdp3_ctrl_reset during splash), so this is safe; we
 		 * hold session->lock, hence nested=true.
 		 */
-		mdp3_csc_apply(mdp3_session, true);
-		/* Restore the panel's gamma LUT lost across power collapse. */
+		mdp3_csc_apply(mdp3_session, true, false);
 		mdp3_apply_default_gamma(mfd->panel_info);
 		goto end;
 	}
@@ -1154,14 +1158,7 @@ static int mdp3_ctrl_on(struct msm_fb_data_type *mfd)
 	 * NOT re-acquire it or the resume path self-deadlocks in D state and the
 	 * panel never powers on at wake.
 	 */
-	mdp3_csc_apply(mdp3_session, true);
-	/*
-	 * Program the panel's DT gamma onto the DMA_P output LUT from the
-	 * first commit, the same way the white-point above is applied.  Our LUT
-	 * does not go through the GC IOCTL path that mdp3_ctrl_pp_resume()
-	 * restores, so re-applying it here on every panel-on is what keeps it
-	 * across power collapse.
-	 */
+	mdp3_csc_apply(mdp3_session, true, false);
 	mdp3_apply_default_gamma(mfd->panel_info);
 	mdp3_ctrl_pp_resume(mfd);
 
@@ -1511,7 +1508,7 @@ int mdp3_ctrl_reset(struct msm_fb_data_type *mfd)
 	 * pp_lock, must not re-take session->lock). This also fills ccs_cache so
 	 * every later pp_resume/wake re-arms the CSC correctly.
 	 */
-	mdp3_csc_apply(mdp3_session, true);
+	mdp3_csc_apply(mdp3_session, true, false);
 	mdp3_apply_default_gamma(mfd->panel_info);
 	if (vsync_client.handler)
 		mdp3_dma->vsync_enable(mdp3_dma, &vsync_client);
@@ -1645,20 +1642,27 @@ static int mdp3_overlay_set(struct msm_fb_data_type *mfd,
 	 * MSMFB_NEW_REQUEST for MDP3
 	 */
 	if (req->id == MSMFB_NEW_REQUEST) {
+		int pack_pattern = mdp3_ctrl_get_pack_pattern(req->src.format);
+		bool pattern_changed = false;
+
 		mutex_lock(&mdp3_session->lock);
 		if (format != MDP3_DMA_IBUF_FORMAT_UNDEFINED &&
 		    (dma->source_config.stride != stride ||
-		     dma->source_config.format != format)) {
+		     dma->source_config.format != format ||
+		     dma->output_config.pack_pattern != pack_pattern)) {
+			pattern_changed =
+				(dma->output_config.pack_pattern != pack_pattern);
 			dma->source_config.format = format;
 			dma->source_config.stride = stride;
-			dma->output_config.pack_pattern =
-				mdp3_ctrl_get_pack_pattern(req->src.format);
+			dma->output_config.pack_pattern = pack_pattern;
 			dma->update_src_cfg = true;
 		}
+		if (pattern_changed)
+			mdp3_ctrl_csc_refresh(mdp3_session);
 		mdp3_session->overlay = *req;
 		mdp3_session->overlay.id = 1;
 		req->id = 1;
-	mutex_unlock(&mdp3_session->lock);
+		mutex_unlock(&mdp3_session->lock);
 	}
 
 	return rc;
@@ -2526,24 +2530,21 @@ static int mdp3_bl_scale_config(struct msm_fb_data_type *mfd,
 }
 
 static int mdp3_csc_config(struct mdp3_session_data *session,
-					struct mdp_csc_cfg_data *data, bool nested)
+					struct mdp_csc_cfg_data *data,
+					bool nested, bool defer)
 {
 	struct mdp3_dma_color_correct_config config;
 	struct mdp3_dma_ccs ccs;
-	int ret = -EINVAL;
+	int ret = 0;
 
 	if (!data) {
 		pr_err("%s : Invalid csc vectors", __func__);
 		return -EINVAL;
 	}
 
-	/*
-	 * 'nested' means the caller (mdp3_ctrl_on, applying the boot/resume
-	 * white-point) already holds session->lock.  Re-acquiring this
-	 * non-recursive mutex here self-deadlocks the resume path in D state,
-	 * wedging pp_lock and leaving the panel unable to power on at wake.
-	 * pp_lock is never held by that caller, so it is always taken here.
-	 */
+	if (!session->dma || !session->dma->config_ccs)
+		return -EINVAL;
+
 	if (!nested)
 		mutex_lock(&session->lock);
 	mutex_lock(&session->dma->pp_lock);
@@ -2563,14 +2564,17 @@ static int mdp3_csc_config(struct mdp3_session_data *session,
 	ccs.pre_lv = data->csc_data.csc_pre_lv;
 	ccs.post_lv = data->csc_data.csc_post_lv;
 
-	/* cache one copy of setting for suspend/resume reconfiguring */
 	session->dma->ccs_cache = *data;
 
-	mdp3_clk_enable(1, 0);
-	ret = session->dma->config_ccs(session->dma, &config, &ccs);
-	mdp3_clk_enable(0, 0);
-	pr_debug("WPDBG: csc_config nested=%d intf_cnt=%d sel=%d diag[B,G,R]=%u,%u,%u rc=%d\n",
-		nested, atomic_read(&mdp3_res->active_intf_cnt),
+	if (defer) {
+		session->dma->ccs_config = config;
+	} else {
+		mdp3_clk_enable(1, 0);
+		ret = session->dma->config_ccs(session->dma, &config, &ccs);
+		mdp3_clk_enable(0, 0);
+	}
+	pr_debug("WPDBG: csc_config nested=%d defer=%d intf_cnt=%d sel=%d diag=%u,%u,%u rc=%d\n",
+		nested, defer, atomic_read(&mdp3_res->active_intf_cnt),
 		config.ccs_sel, data->csc_data.csc_mv[0],
 		data->csc_data.csc_mv[4], data->csc_data.csc_mv[8], ret);
 	mutex_unlock(&session->dma->pp_lock);
@@ -2757,24 +2761,33 @@ static void mdp3_hsic_matrix(s32 m[9], s32 bias[3])
 	bias[2] = bias[0];
 }
 
-static int mdp3_csc_apply(struct mdp3_session_data *mdp3_session, bool nested)
+static int mdp3_csc_apply(struct mdp3_session_data *mdp3_session,
+				bool nested, bool defer)
 {
 	static const s32 lum[3] = { MDP3_LUM_R, MDP3_LUM_G, MDP3_LUM_B };
-	/* scanout is B,G,R at the CSC; remap logical RGB -> scanout on write */
-	static const int bgr[3] = { 2, 1, 0 };
+	static const int rgb_map[3] = { 0, 1, 2 };
+	static const int bgr_map[3] = { 2, 1, 0 };
+	const int *map;
 	struct mdp_csc_cfg_data cfg;
 	s32 m[9], bias[3], cal[3];
 	u32 rgb_wp[3];
+	u32 pack_pattern = 0;
 	int i, j, ret;
 
-	/* Preserve the panel's inherited color pipeline on a16. */
 	if (mdp3_session->mfd && mdp3_session->mfd->panel_info &&
 	    mdp3_session->mfd->panel_info->recovery_csc_disable)
 		return 0;
 
+	if (mdp3_session->dma)
+		pack_pattern = mdp3_session->dma->output_config.pack_pattern;
+	if (!pack_pattern && mdp3_session->mfd)
+		pack_pattern =
+			mdp3_ctrl_get_pack_pattern(mdp3_session->mfd->fb_imgType);
+	map = (pack_pattern == MDP3_DMA_OUTPUT_PACK_PATTERN_BGR) ?
+		bgr_map : rgb_map;
+
 	memset(&cfg, 0, sizeof(cfg));
 
-	/* user calibration composed with the white-point of the active panel */
 	mdp3_get_color_tuning(mdp3_session->panel ?
 			&mdp3_session->panel->panel_info : NULL,
 			NULL, rgb_wp);
@@ -2783,15 +2796,9 @@ static int mdp3_csc_apply(struct mdp3_session_data *mdp3_session, bool nested)
 				mdp3_rgb_to_coeff(rgb_wp[i])) /
 			MDP3_CSC_UNITY;
 
-	/* content adjustment: HSIC (neutral by default) */
 	mdp3_hsic_matrix(m, bias);
 
 	if (mdp3_reading_mode) {
-		/*
-		 * Grayscale on top of HSIC: collapse every output row to the
-		 * luminance of the (adjusted) input, M' = Gray . M where
-		 * Gray[i][j] = lum[j].  Calibration below then tints the gray.
-		 */
 		s32 gm[3], gb;
 
 		for (j = 0; j < 3; j++) {
@@ -2810,27 +2817,24 @@ static int mdp3_csc_apply(struct mdp3_session_data *mdp3_session, bool nested)
 		}
 	}
 
-	/* outermost: per-channel display calibration scales rows + bias */
 	for (i = 0; i < 3; i++) {
 		for (j = 0; j < 3; j++)
 			m[i * 3 + j] = (m[i * 3 + j] * cal[i]) / MDP3_CSC_UNITY;
 		bias[i] = (bias[i] * cal[i]) / MDP3_CSC_UNITY;
 	}
 
-	/* write in B,G,R scanout order; encode signed coeffs to the HW fields */
 	for (i = 0; i < 3; i++) {
 		for (j = 0; j < 3; j++) {
-			s32 v = mdp3_clamp_sym(m[bgr[i] * 3 + bgr[j]],
+			s32 v = mdp3_clamp_sym(m[map[i] * 3 + map[j]],
 					MDP3_CSC_MV_LIM);
 
 			cfg.csc_data.csc_mv[i * 3 + j] = v & MDP3_CSC_MV_MASK;
 		}
 		cfg.csc_data.csc_post_bv[i] =
-			mdp3_clamp_sym(bias[bgr[i]], MDP3_CSC_BV_LIM) &
+			mdp3_clamp_sym(bias[map[i]], MDP3_CSC_BV_LIM) &
 			MDP3_CSC_BV_MASK;
 	}
 
-	/* full 8-bit clamp range (avoids clamping the output to 0) */
 	for (i = 0; i < 6; i += 2) {
 		cfg.csc_data.csc_pre_lv[i] = 0x0;
 		cfg.csc_data.csc_pre_lv[i + 1] = 0xff;
@@ -2844,7 +2848,16 @@ static int mdp3_csc_apply(struct mdp3_session_data *mdp3_session, bool nested)
 		return ret;
 	}
 
-	return mdp3_csc_config(mdp3_session, &cfg, nested);
+	return mdp3_csc_config(mdp3_session, &cfg, nested, defer);
+}
+
+void mdp3_ctrl_csc_refresh(struct mdp3_session_data *mdp3_session)
+{
+	if (!mdp3_session || !mdp3_session->dma)
+		return;
+	if (!mdp3_session->dma->ccs_config.ccs_enable)
+		return;
+	mdp3_csc_apply(mdp3_session, true, true);
 }
 
 static ssize_t mdp3_rgb_show(struct device *dev,
@@ -2885,7 +2898,7 @@ static ssize_t mdp3_rgb_store(struct device *dev,
 	if (mdp3_session->status != 1)
 		return count;
 
-	ret = mdp3_csc_apply(mdp3_session, false);
+	ret = mdp3_csc_apply(mdp3_session, false, false);
 	if (ret)
 		return ret;
 
@@ -2922,7 +2935,7 @@ static ssize_t mdp3_reading_mode_store(struct device *dev,
 	if (mdp3_session->status != 1)
 		return count;
 
-	ret = mdp3_csc_apply(mdp3_session, false);
+	ret = mdp3_csc_apply(mdp3_session, false, false);
 	if (ret)
 		return ret;
 
@@ -2982,7 +2995,7 @@ static ssize_t mdp3_hsic_store(struct device *dev,
 	if (mdp3_session->status != 1)
 		return count;
 
-	ret = mdp3_csc_apply(mdp3_session, false);
+	ret = mdp3_csc_apply(mdp3_session, false, false);
 	if (ret)
 		return ret;
 
@@ -3028,7 +3041,7 @@ static int mdp3_pp_ioctl(struct msm_fb_data_type *mfd,
 			break;
 		}
 		ret = mdp3_csc_config(mdp3_session,
-						&(mdp_pp.data.csc_cfg_data), false);
+						&(mdp_pp.data.csc_cfg_data), false, false);
 		break;
 	case mdp_op_lut_cfg:
 		lut = &mdp_pp.data.lut_cfg_data;
