@@ -273,6 +273,11 @@ config NET_SCH_FQ_CODEL
 
 	  If unsure, say N.
 
+config DEFAULT_FQ_CODEL
+	bool "Use FQ_CODEL as default qdisc"
+	depends on NET_SCH_FQ_CODEL=y
+	default n
+
 config NET_SCH_FQ
 	tristate "Fair Queue"
 	help

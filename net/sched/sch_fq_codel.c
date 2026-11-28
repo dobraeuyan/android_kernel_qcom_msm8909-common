@@ -723,7 +723,12 @@ static struct Qdisc_ops fq_codel_qdisc_ops __read_mostly = {
 
 static int __init fq_codel_module_init(void)
 {
-	return register_qdisc(&fq_codel_qdisc_ops);
+	int ret = register_qdisc(&fq_codel_qdisc_ops);
+#ifdef CONFIG_DEFAULT_FQ_CODEL
+	if (!ret)
+		qdisc_set_default("fq_codel");
+#endif
+	return ret;
 }
 
 static void __exit fq_codel_module_exit(void)

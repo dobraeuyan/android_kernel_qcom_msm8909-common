@@ -1383,65 +1383,14 @@ static int __init clock_late_init(void)
 				initdata);
 	}
 
-	/*
-	 * Release the handoff reference (prepare_count/count == 1) that the
-	 * bootloader (LK) handed off for each clock it left enabled. This is
-	 * the standard upstream behaviour: any clock not separately claimed by
-	 * a driver vote drops to refcount 0 and gates here.
-	 *
-	 * For the DSI display tree (vco/byte0/pclk0/esc0) this is required so
-	 * the byte/pixel RCG root can later be gated: mdss_dsi_cont_splash_config()
-	 * holds its own MDSS_DSI_ALL_CLKS vote that keeps the panel scanning out
-	 * through the splash, so dropping the bare handoff ref here is safe.
-	 * Once the kernel owns the votes, the first real blank gates the RCG
-	 * (root off) and a subsequent power-on can re-lock the PLL with the RCG
-	 * gated instead of hanging rcg_update_config() (root-on reprogram race).
-	 *
-	 * NOTE: previously skipped (LK display workaround) because the MDSS SMMU
-	 * failed to probe; that path now works, so the inherited clocks must be
-	 * released to make display power management possible.
-	 */
-	/*
-	 * SELECTIVE handoff release (2026-06-21): the GLOBAL release hangs here
-	 * (a non-display clock gets gated while HW still uses it -> AHB/AXI bus
-	 * stall; last traced release was usb_hs_system_clk_src). But display
-	 * power management only needs the DSI-LINK tree to drop to a real
-	 * refcount: today the synthetic handoff ref pins the 28lpm VCO
-	 * "prepared" forever, so vco_unprepare/vco_prepare never run -> after a
-	 * blank+resume the wake phy_init resets the PLL and nobody re-locks it
-	 * -> dead byte clk -> cmd_dma_tx 0xf0 timeout -> black screen.
-	 *
-	 * Releasing ONLY the DSI-link clocks is safe from the boot hang because
-	 * mdss_dsi_cont_splash_config() holds its own MDSS_DSI_ALL_CLKS vote
-	 * through the splash (count >= 2), so dropping the bare handoff ref
-	 * leaves them ON until DSI removes that vote at the first suspend/resume
-	 * (video mode). Then the byte/pixel RCG root gates and the next power-on
-	 * re-locks the PLL via vco_prepare. MDP-side bus clocks (mdp/ahb/axi/
-	 * vsync) are intentionally NOT released here: they are the likely
-	 * global-release stall culprits and are not needed for the PLL re-lock.
-	 */
 	list_for_each_entry_safe(h, h_temp, &handoff_list, list) {
-		const char *n = h->clk->dbg_name ? h->clk->dbg_name : "?";
-		bool dsi_link = !strncmp(n, "dsi_pll0", 8) ||
-				!strcmp(n, "byte0_clk_src") ||
-				!strcmp(n, "pclk0_clk_src") ||
-				!strcmp(n, "esc0_clk_src") ||
-				!strcmp(n, "gcc_mdss_byte0_clk") ||
-				!strcmp(n, "gcc_mdss_pclk0_clk") ||
-				!strcmp(n, "gcc_mdss_esc0_clk");
-		if (!dsi_link)
-			continue;
-		pr_emerg("clk_late: releasing %s (c=%lu p=%lu)\n", n,
-			 (unsigned long)h->clk->count,
-			 (unsigned long)h->clk->prepare_count);
 		clk_disable_unprepare(h->clk);
-		pr_emerg("clk_late: %s OK\n", n);
 		list_del(&h->list);
 		kfree(h);
 	}
 
 	list_for_each_entry_safe(v, v_temp, &handoff_vdd_list, list) {
-		//unvote_vdd_level(v->vdd_class, v->vdd_class->num_levels - 1);
+		unvote_vdd_level(v->vdd_class, v->vdd_class->num_levels - 1);
 		list_del(&v->list);
 		kfree(v);
 	}
